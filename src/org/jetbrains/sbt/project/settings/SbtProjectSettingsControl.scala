@@ -62,12 +62,10 @@ class SbtProjectSettingsControl(context: Context, initialSettings: SbtProjectSet
     content.add(optionPanel, fillLineConstraints)
 
     // TODO Remove the patching when the External System will provide this functionality natively
-    content.getComponents.toSeq.foreachDefined {
-      case checkbox: JCheckBox
-        if checkbox.getText.startsWith("Create directories") =>
-        // set it to off so that it doesn't stay enabled for people who clicked it before it was removed
-        checkbox.setSelected(false)
-        Option(checkbox.getParent).foreach(_.remove(checkbox))
+    findCheckbox(content, "Create directories").foreach { checkbox =>
+      checkbox.setSelected(false)
+      // need to actually remove it because ExternalSystem somehow resets visibility
+      Option(checkbox.getParent).foreach(_.remove(checkbox))
     }
 
     if (context == Context.Wizard) {
@@ -83,8 +81,19 @@ class SbtProjectSettingsControl(context: Context, initialSettings: SbtProjectSet
 
       // hide the sbt shell option until it matures (SCL-10984)
       useSbtShellCheckBox.setVisible(false)
+
+      findCheckbox(content, "Use auto-import").foreach { checkbox =>
+        Option(checkbox.getParent).foreach(_.remove(checkbox))
+      }
     }
   }
+
+  private def findCheckbox(content: PaintAwarePanel, label: String): Option[JCheckBox] =
+    content.getComponents.toSeq.collectFirst {
+      case checkbox: JCheckBox
+        if checkbox.getText.startsWith(label) =>
+        checkbox
+    }
 
   def isExtraSettingModified: Boolean = {
     val settings = getInitialSettings
