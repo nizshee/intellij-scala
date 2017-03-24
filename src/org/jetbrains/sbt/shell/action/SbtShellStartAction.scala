@@ -29,6 +29,7 @@ class SbtShellStartAction extends ExternalSystemAction {
     super.isVisible(e) &&
     (SbtProjectSystem.Id == getSystemId(e) ||
       ExternalSystemDataKeys.VIEW.getData(e.getDataContext) == null &&
+      hasProject(e) &&
       !SbtSystemSettings.getInstance(e.getProject).getLinkedProjectsSettings.isEmpty)
 
   override def isEnabled(e: AnActionEvent): Boolean = hasProject(e)
