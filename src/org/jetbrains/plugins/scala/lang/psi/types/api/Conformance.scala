@@ -6,6 +6,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Computable
 import com.intellij.psi.PsiClass
 import com.intellij.util.containers.ContainerUtil
+import org.jetbrains.plugins.scala.actions.DebugConformanceAction
 import org.jetbrains.plugins.scala.caches.RecursionManager
 import org.jetbrains.plugins.scala.lang.psi.types._
 
@@ -30,7 +31,7 @@ trait Conformance extends TypeSystemOwner {
   final def conformsInner(left: ScType, right: ScType,
                           visited: Set[PsiClass] = Set.empty,
                           substitutor: ScUndefinedSubstitutor = ScUndefinedSubstitutor(),
-                          checkWeak: Boolean = false): Result = {
+                          checkWeak: Boolean = false, handler: Option[DebugConformanceAction.Handler] = None): Result = {
     ProgressManager.checkCanceled()
 
     if (left.equiv(Any) || right.equiv(Nothing)) return (true, substitutor)
@@ -46,7 +47,7 @@ trait Conformance extends TypeSystemOwner {
       return (false, ScUndefinedSubstitutor())
     }
 
-    val res = guard.doPreventingRecursion(key, computable(left, right, visited, checkWeak))
+    val res = guard.doPreventingRecursion(key, computable(left, right, visited, checkWeak, handler))
     if (res == null) return (false, ScUndefinedSubstitutor())
     cache.put(key, res)
     if (substitutor.isEmpty) return res
@@ -57,5 +58,5 @@ trait Conformance extends TypeSystemOwner {
 
   protected def computable(left: ScType, right: ScType,
                            visited: Set[PsiClass],
-                           checkWeak: Boolean): Computable[(Boolean, ScUndefinedSubstitutor)]
+                           checkWeak: Boolean, handler: Option[DebugConformanceAction.Handler]): Computable[(Boolean, ScUndefinedSubstitutor)]
 }

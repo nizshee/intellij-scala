@@ -2,6 +2,7 @@ package org.jetbrains.plugins.dotty.lang.psi.types
 
 import com.intellij.openapi.util.Computable
 import com.intellij.psi.PsiClass
+import org.jetbrains.plugins.scala.actions.DebugConformanceAction
 import org.jetbrains.plugins.scala.lang.psi.types._
 
 /**
@@ -10,7 +11,8 @@ import org.jetbrains.plugins.scala.lang.psi.types._
 object Conformance extends api.Conformance {
   override implicit lazy val typeSystem = DottyTypeSystem
 
-  override protected def computable(left: ScType, right: ScType, visited: Set[PsiClass], checkWeak: Boolean) = new Computable[(Boolean, ScUndefinedSubstitutor)] {
+  override protected def computable(left: ScType, right: ScType, visited: Set[PsiClass], checkWeak: Boolean,
+                                    handler: Option[DebugConformanceAction.Handler]) = new Computable[(Boolean, ScUndefinedSubstitutor)] {
     override def compute(): (Boolean, ScUndefinedSubstitutor) = (false, ScUndefinedSubstitutor())
   }
 
