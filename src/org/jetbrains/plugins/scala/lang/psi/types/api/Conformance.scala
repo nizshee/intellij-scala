@@ -6,7 +6,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Computable
 import com.intellij.psi.PsiClass
 import com.intellij.util.containers.ContainerUtil
-import org.jetbrains.plugins.scala.actions.DebugConformanceAction
+import org.jetbrains.plugins.scala.actions.{ConformanceCondition, DebugConformanceAction}
 import org.jetbrains.plugins.scala.caches.RecursionManager
 import org.jetbrains.plugins.scala.lang.psi.types._
 
@@ -34,12 +34,18 @@ trait Conformance extends TypeSystemOwner {
                           checkWeak: Boolean = false, handler: Option[DebugConformanceAction.Handler] = None): Result = {
     ProgressManager.checkCanceled()
 
-    if (left.equiv(Any) || right.equiv(Nothing)) return (true, substitutor)
+    if (left.equiv(Any) || right.equiv(Nothing)) {
+      handler.foreach { h =>
+        if (left equiv Any) h + ConformanceCondition.ToAny(right)
+        else h + ConformanceCondition.FromNothing(left)
+      }
+      return (true, substitutor)
+    }
 
     val key = (left, right, checkWeak)
 
     val tuple = cache.get(key)
-    if (tuple != null) {
+    if (tuple != null && handler.isEmpty) {
       if (substitutor.isEmpty) return tuple
       return tuple.copy(_2 = substitutor + tuple._2)
     }

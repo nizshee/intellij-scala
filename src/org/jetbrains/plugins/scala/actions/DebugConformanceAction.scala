@@ -25,120 +25,107 @@ import org.jetbrains.plugins.scala.lang.psi.types.api.designator.{ScDesignatorTy
 import org.jetbrains.plugins.scala.lang.psi.types.api.{JavaArrayType, ParameterizedType, StdType, TypeParameterType, TypeSystem, UndefinedType}
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.{ScMethodType, ScTypePolymorphicType}
 import org.jetbrains.plugins.scala.lang.psi.types.result.{Failure, Success}
-import org.jetbrains.plugins.scala.lang.psi.types.{Conformance, ScAbstractType, ScCompoundType, ScExistentialArgument, ScExistentialType, ScType, ScalaTypeVisitor}
+import org.jetbrains.plugins.scala.lang.psi.types.{Conformance, ScType}
 import org.jetbrains.plugins.scala.lang.refactoring.util.ScalaRefactoringUtil
 
 
 object DebugConformanceAction {
+
   private val debug: Boolean = true
   def pr(msg: String): Unit = if (debug) println(msg)
 
-  case class Value(scType: ScType, prefix: String = "")
+  case class Value(relation: Relation, prefix: String = "")
+
+  case class RelationValue(v: Relation, prefix: String = "")
+  case class ConditionValue(v: ConformanceCondition, prefix: String = "")
 
   class DebugConformanceTreeStructure(project: Project, values: Seq[Value]) extends AbstractTreeStructure {
 
-    private class DebugConformanceNode(value: Value) extends AbstractTreeNode[Value](project, value) {
-
-      private var children: Seq[Value] = Seq()
-
-      private var text: String = ""
-
-      private val visitor = new ScalaTypeVisitor {
-        override def visitStdType(s: StdType): Unit = {
-          pr("std")
-          text = s.name
-        }
-
-        override def visitJavaArrayType(`type`: JavaArrayType): Unit = {
-          pr("javaArray")
-          ???
-        }
-
-        override def visitMethodType(m: ScMethodType): Unit = {
-          pr("method")
-          text = "method"
-          children = m.params.zipWithIndex.map(p => Value(p._1.paramType, s"par${p._2}")) :+ Value(m.returnType, "ret")
-        }
-
-        override def visitUndefinedType(`type`: UndefinedType): Unit = {
-          pr("undefined")
-        }
-
-        override def visitTypeParameterType(t: TypeParameterType): Unit = {
-          pr("typeParameter")
-          text = t.name
-          children = t.arguments.map { argument => Value(argument) }
-        }
-
-        override def visitParameterizedType(p: ParameterizedType): Unit = {
-          pr("parametrized")
-          text = "parametrized"
-          children = Value(p.designator, "designator") +: p.typeArguments.zipWithIndex.map(p => Value(p._1, s"arg${p._2}"))
-        }
-
-        override def visitProjectionType(p: ScProjectionType): Unit = {
-          pr("projection")
-        }
-
-        override def visitThisType(t: ScThisType): Unit = {
-          pr("this")
-        }
-
-        override def visitDesignatorType(d: ScDesignatorType): Unit = {
-          text = d.element.getName // TODO how about type costructors?
-          d.element match {
-            case v: ScBindingPattern =>
-              pr("binding pattern")
-            case v: ScParameter =>
-              pr("parameter")
-            case v: ScFieldId =>
-              pr("fieldId")
-            case _ =>
-              pr(d.isAliasType.toString)
-          }
-        }
-
-        override def visitCompoundType(c: ScCompoundType): Unit = {
-          pr("compound")
-        }
-
-        override def visitExistentialType(e: ScExistentialType): Unit = {
-          pr("existential")
-        }
-
-        override def visitExistentialArgument(s: ScExistentialArgument): Unit = {
-          pr("existentialArgument")
-        }
-
-        override def visitAbstractType(a: ScAbstractType): Unit = {
-          pr("abstract")
-        }
-
-        override def visitTypePolymorphicType(t: ScTypePolymorphicType): Unit = {
-          pr("typePolymorphic")
-        }
-      }
-
-      value.scType.visitType(visitor)
+    private class RelationNode(relation: RelationValue) extends AbstractTreeNode[RelationValue](project, relation) {
 
       override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
         val list = new util.ArrayList[AbstractTreeNode[_]]()
-        children.foreach { child =>
-          list.add(new DebugConformanceNode(child))
+        relation.v match {
+          case r: Relation.Conformance =>
+            r.conditions.foreach { condition =>
+              list.add(new ConditionNode(ConditionValue(condition)))
+            }
+          case _ =>
+
         }
         list
       }
 
       override def update(presentationData: PresentationData): Unit = {
-        presentationData.setPresentableText(value.prefix + (if (value.prefix.nonEmpty) ": " else "") + text)
+        relation.v match {
+          case r: Relation.Equivalence =>
+            presentationData.setPresentableText((if (relation.prefix.nonEmpty) relation.prefix + ": " else "") +
+              s"${r.left} =: ${r.right} (${r.satisfy})")
+          case r: Relation.Conformance =>
+            presentationData.setPresentableText((if (relation.prefix.nonEmpty) relation.prefix + ": " else "") +
+              s"${r.left} <: ${r.right} (${r.satisfy})")
+        }
       }
 
+    }
+
+    private class ConditionNode(condition: ConditionValue) extends AbstractTreeNode[ConditionValue](project, condition) {
+      override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
+        val list = new util.ArrayList[AbstractTreeNode[_]]()
+        condition.v match {
+          case c: ConformanceCondition.Equivalent =>
+            list.add(new RelationNode(RelationValue(c.equivalence)))
+          case c: ConformanceCondition.Parametrize =>
+            c.equals.foreach(c => list.add(new RelationNode(RelationValue(c))))
+            c.conform.foreach {
+              case ConformanceCondition.Invariant(param, e) =>
+                list.add(new RelationNode(RelationValue(e, s"invariant $param")))
+              case ConformanceCondition.Covariant(param, e) =>
+                list.add(new RelationNode(RelationValue(e, s"covariant $param")))
+              case ConformanceCondition.Contrvariant(param, e) =>
+                list.add(new RelationNode(RelationValue(e, s"contrvariant $param")))
+            }
+          case c: ConformanceCondition.Transitive =>
+            list.add(new RelationNode(RelationValue(c.lm)))
+            list.add(new RelationNode(RelationValue(c.mr)))
+          case c: ConformanceCondition.Same =>
+            list.add(new RelationNode(RelationValue(c.relation)))
+          case c: ConformanceCondition.Projection =>
+            list.add(new RelationNode(RelationValue(c.conforms)))
+          case _ =>
+        }
+        list
+      }
+
+      override def update(presentationData: PresentationData): Unit = {
+        val data = condition.v match {
+          case c: ConformanceCondition.Equivalent =>
+            s"${c.equivalence.right} conformance to ${c.equivalence.left} if they are equivalent"
+          case c: ConformanceCondition.BaseClass =>
+            s"${c.right} is subclass of ${c.left}"
+          case c: ConformanceCondition.FromNothing =>
+            s"Nothing is always confroms to ${c.left}"
+          case c: ConformanceCondition.ToAny =>
+            s"${c.right} is always confroms to Any"
+          case c: ConformanceCondition.Parametrize =>
+            s"conformance for parametrized types"
+          case c: ConformanceCondition.Transitive =>
+            s"transitive ${c.left} <: ${c.middle} <: ${c.right}"
+          case c: ConformanceCondition.Same =>
+            s"same"
+          case c: ConformanceCondition.Projection =>
+            s"conforms as projections if ${c.conforms.left} <: ${c.conforms.right}"
+          case _ =>
+        }
+        presentationData.setPresentableText(s"$data (${condition.v.satisfy})")
+
+      }
     }
 
     private class RootNode extends AbstractTreeNode[Any](project, ()) {
       override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
         val list = new util.ArrayList[AbstractTreeNode[_]]()
-        values.foreach { result => list.add(new DebugConformanceNode(result)) }
+        values.foreach { value => list.add(new RelationNode(RelationValue(value.relation))) }
         list
       }
 
@@ -150,8 +137,11 @@ object DebugConformanceAction {
     override def getRootElement: AnyRef = new RootNode
 
     override def getChildElements(o: scala.Any): Array[AnyRef] = o match {
-      case _: RootNode => values.map(new DebugConformanceNode(_)).toArray
-      case n: DebugConformanceNode =>
+      case _: RootNode => values.map(v => new RelationNode(RelationValue(v.relation))).toArray
+      case n: RelationNode =>
+        val childrenImpl = n.getChildren
+        childrenImpl.toArray(new Array[AnyRef](childrenImpl.size))
+      case n: ConditionNode =>
         val childrenImpl = n.getChildren
         childrenImpl.toArray(new Array[AnyRef](childrenImpl.size))
       case _ => Array.empty
@@ -164,10 +154,21 @@ object DebugConformanceAction {
     override def commit(): Unit = {}
   }
 
-  class Handler(nesting: Int = 0, parent: Option[Handler] = None) {
+  class Handler(nesting: Int = 0) {
 
     private val offset = nesting * 1
     private val delimeter = if (offset < 1) "" else "|" * (offset - 1) + "|"
+
+    private var _conditions: Seq[ConformanceCondition] = Seq()
+    private var _variances: Seq[ConformanceCondition.Variance] = Seq()
+
+    def +(condition: ConformanceCondition): Unit = _conditions :+= condition
+
+    def +(variance: ConformanceCondition.Variance): Unit = _variances :+= variance
+
+    def conditions: Seq[ConformanceCondition] = _conditions
+
+    def relations: Seq[ConformanceCondition.Variance] = _variances
 
     def log(any: Any): Unit = println(delimeter + any)
 
@@ -197,7 +198,9 @@ object DebugConformanceAction {
       println(delimeter)
     }
 
-    def inner: Handler = new Handler(nesting + 1, Some(this))
+
+    def inner: Handler =  new Handler(nesting + 1)
+
   }
 
 }
@@ -317,14 +320,15 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
           case Success(right, _) =>
             handler.log("Action fired on:")
             handler.logtn(left, right)
-//            val values = Seq(Value(right))
-//            showPopup(values)
-//            val (canConform, subst) = Conformance.conformsInner(left, right, handler = Some(handler.inner))
-//            if (canConform) {
-//              handler.logn("can conform")
-//              handler.logn(subst)
-//            }
-//            else handler.logn("can't conform")
+            val inner = handler.inner
+            val (canConform, subst) = Conformance.conformsInner(left, right, handler = Some(inner))
+            val values = Seq(Value(Relation.Conformance(left, right, inner.conditions)))
+            showPopup(values)
+            println(inner.conditions)
+            if (canConform) {
+              handler.logn("can conform")
+            }
+            else handler.logn("can't conform")
           case Failure(cause, _) => showHint(s"Can't derive type: $cause")
         }
       case None => showHint("No expected type found.")
