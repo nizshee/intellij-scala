@@ -303,7 +303,7 @@ object Conformance extends api.Conformance {
     trait AbstractVisitor extends ScalaTypeVisitor {
       override def visitAbstractType(a: ScAbstractType) {
         handler.foreach { h =>
-          h.rvisit("AbstractVisitor - ??? (strange conditions)")
+          h.rvisit("AbstractVisitor - ok ??? (strange conditions)")
         }
         val left =
           if (a.parameterType.arguments.nonEmpty && !l.isInstanceOf[ScParameterizedType]) {
@@ -311,17 +311,18 @@ object Conformance extends api.Conformance {
           }
           else l
         if (!a.lower.equiv(Nothing)) {
+          val inner = handler.map(_.inner)
+          result = conformsInner(left, a.lower, visited, undefinedSubst, checkWeak, handler = inner)
           handler.foreach { h =>
-            h.logn("check left conforms lower bound")
+            h + ConformanceCondition.PolymorphicArgument(a, l, satisfy = result._1)
           }
-          result = conformsInner(left, a.lower, visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
         } else {
           result = (true, undefinedSubst)
-        }
-        if (result._1 && !a.upper.equiv(Any)) {
           handler.foreach { h =>
-            h.logn("check left conforms upper bound")
+            h + ConformanceCondition.PolymorphicArgument(a, l, satisfy = true)
           }
+        }
+        if (result._1 && !a.upper.equiv(Any)) { // TODO? why is optionally?
           val t = conformsInner(a.upper, left, visited, result._2, checkWeak, handler = handler.map(_.inner))
           if (t._1) result = t //this is optionally
         }
@@ -1924,7 +1925,7 @@ object Conformance extends api.Conformance {
 
     override def visitAbstractType(a: ScAbstractType) {
       handler.foreach { h =>
-        h.visit("visitAbstractType - ???")
+        h.visit("visitAbstractType - ok ??? (strange conditions)")
       }
       val rightVisitor = new ValDesignatorSimplification with UndefinedSubstVisitor {}
       r.visitType(rightVisitor)
@@ -1934,7 +1935,11 @@ object Conformance extends api.Conformance {
           ScParameterizedType(r, a.parameterType.arguments)
         else r
 
-      result = conformsInner(a.upper, right, visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
+      val inner = handler.map(_.inner)
+      result = conformsInner(a.upper, right, visited, undefinedSubst, checkWeak, handler = inner) // TODO? has opposite analog but much simplier
+      handler.foreach { h =>
+        h + ConformanceCondition.PolymorphicArgument(a, right, satisfy = result._1)
+      }
       if (result._1) {
         val t = conformsInner(right, a.lower, visited, result._2, checkWeak, handler = handler.map(_.inner))
         if (t._1) result = t // TODO? why is optional?

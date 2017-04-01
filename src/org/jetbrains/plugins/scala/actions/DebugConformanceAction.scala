@@ -122,6 +122,8 @@ object DebugConformanceAction {
             s"${c.upper} is upper bound for ${c.`type`}"
           case c: ConformanceCondition.TypeLower =>
             s"${c.lower} is lower bound for ${c.`type`}"
+          case c: ConformanceCondition.PolymorphicArgument =>
+            s"abstract ${c.left} >: ${c.left.upper} <: ${c.left.lower} satisfies ${c.right}"
           case _ =>
         }
         val msg = condition.v.msg
