@@ -92,6 +92,9 @@ object DebugConformanceAction {
             list.add(new RelationNode(RelationValue(c.relation)))
           case c: ConformanceCondition.Projection =>
             list.add(new RelationNode(RelationValue(c.conforms)))
+          case c: ConformanceCondition.Method =>
+            c.ret.foreach(c => list.add(new RelationNode(RelationValue(c, "ret"))))
+            c.args.foreach(c => list.add(new RelationNode(RelationValue(c.relation, "arg"))))
           case _ =>
         }
         list
@@ -108,16 +111,21 @@ object DebugConformanceAction {
           case c: ConformanceCondition.ToAny =>
             s"${c.right} is always confroms to Any"
           case c: ConformanceCondition.Parametrize =>
-            s"conformance for parametrized types"
+            s"conformance for parametrized types" + (if (!c.sameLength) " [different length]" else "")
           case c: ConformanceCondition.Transitive =>
             s"transitive ${c.left} <: ${c.middle} <: ${c.right}"
-          case c: ConformanceCondition.Same =>
-            s"same"
           case c: ConformanceCondition.Projection =>
             s"conforms as projections if ${c.conforms.left} <: ${c.conforms.right}"
+          case c: ConformanceCondition.Method =>
+            s"same arguments and return types conform" + (if (!c.sameLen) " [different length]" else "")
+          case c: ConformanceCondition.TypeUpper =>
+            s"${c.upper} is upper bound for ${c.`type`}"
+          case c: ConformanceCondition.TypeLower =>
+            s"${c.lower} is lower bound for ${c.`type`}"
           case _ =>
         }
-        presentationData.setPresentableText(s"$data (${condition.v.satisfy})")
+        val msg = condition.v.msg
+        presentationData.setPresentableText(s"$data (${condition.v.satisfy})" + (if (msg.nonEmpty) "//" else "") + msg)
 
       }
     }
@@ -162,7 +170,10 @@ object DebugConformanceAction {
     private var _conditions: Seq[ConformanceCondition] = Seq()
     private var _variances: Seq[ConformanceCondition.Variance] = Seq()
 
-    def +(condition: ConformanceCondition): Unit = _conditions :+= condition
+    def +(condition: ConformanceCondition): ConformanceCondition = {
+      _conditions :+= condition
+      condition
+    }
 
     def +(variance: ConformanceCondition.Variance): Unit = _variances :+= variance
 

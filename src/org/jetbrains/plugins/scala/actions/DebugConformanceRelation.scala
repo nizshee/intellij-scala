@@ -4,10 +4,14 @@ import org.jetbrains.plugins.scala.lang.psi.api.statements.params.ScTypeParam
 import org.jetbrains.plugins.scala.lang.psi.types.api.designator.ScProjectionType
 import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScParameterizedType, ScType}
 import org.jetbrains.plugins.scala.lang.psi.types.api.{ParameterizedType, StdType, TypeParameterType}
+import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.ScMethodType
 
 
 sealed trait ConformanceCondition {
   def satisfy: Boolean
+  var _msg: String = ""
+  def +(msg: String): Unit = _msg = msg
+  def msg: String = _msg
 }
 
 object ConformanceCondition {
@@ -49,7 +53,7 @@ object ConformanceCondition {
     override def satisfy: Boolean = equivalence.satisfy
   }
 
-  case class Parametrize(left: ParameterizedType, right: ParameterizedType, equals: Option[Relation.Equivalence], conform: Seq[Variance]) extends ConformanceCondition {
+  case class Parametrize(left: ParameterizedType, right: ParameterizedType, equals: Option[Relation.Equivalence], sameLength: Boolean,conform: Seq[Variance]) extends ConformanceCondition {
     override def satisfy: Boolean = left.typeArguments.size == right.typeArguments.size && right.typeArguments.size == conform.size &&
       equals.exists(_.satisfy) && conform.forall(_.satisfy)
   }
@@ -67,6 +71,11 @@ object ConformanceCondition {
   }
 
   case class BaseClass(left: ScType, right: ScType, satisfy: Boolean) extends ConformanceCondition
+
+  case class Method(left: ScMethodType, right: ScMethodType, sameLen: Boolean, ret: Option[Relation.Conformance],
+                    args: Seq[Invariant]) extends ConformanceCondition {
+    override def satisfy: Boolean = sameLen && ret.exists(_.satisfy) && args.forall(_.satisfy)
+  }
 
 }
 
