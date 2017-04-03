@@ -56,6 +56,9 @@ trait Conformance extends TypeSystemOwner {
     val res = guard.doPreventingRecursion(key, computable(left, right, visited, checkWeak, handler))
     if (res == null) return (false, ScUndefinedSubstitutor())
     cache.put(key, res)
+//    if (!substitutor.isEmpty) {
+//      println(left, right)
+//    }
     if (substitutor.isEmpty) return res
     res.copy(_2 = substitutor + res._2)
   }
