@@ -63,7 +63,7 @@ object DebugConformanceAction {
               s"${r.left} =: ${r.right} (${r.satisfy})")
           case r: Relation.Conformance =>
             presentationData.setPresentableText((if (relation.prefix.nonEmpty) relation.prefix + ": " else "") +
-              s"${r.left} <: ${r.right} (${r.satisfy})")
+              s"${r.left} >: ${r.right} (${r.satisfy})")
         }
       }
 
@@ -113,9 +113,9 @@ object DebugConformanceAction {
           case c: ConformanceCondition.Parametrize =>
             s"conformance for parametrized types" + (if (!c.sameLength) " [different length]" else "")
           case c: ConformanceCondition.Transitive =>
-            s"transitive ${c.left} <: ${c.middle} <: ${c.right}"
+            s"transitive ${c.left} >: ${c.middle} >: ${c.right}"
           case c: ConformanceCondition.Projection =>
-            s"conforms as projections if ${c.conforms.left} <: ${c.conforms.right}"
+            s"conforms as projections if ${c.conforms.left} >: ${c.conforms.right}"
           case c: ConformanceCondition.Method =>
             s"same arguments and return types conform" + (if (!c.sameLen) " [different length]" else "")
           case c: ConformanceCondition.TypeUpper =>
@@ -124,6 +124,8 @@ object DebugConformanceAction {
             s"${c.lower} is lower bound for ${c.`type`}"
           case c: ConformanceCondition.PolymorphicArgument =>
             s"abstract ${c.left} >: ${c.left.upper} <: ${c.left.lower} satisfies ${c.right}"
+          case c: ConformanceCondition.FromNull =>
+            s"${c.left} is ${if (c.anyRef) "" else "not "}conforms to AnyRef"
           case _ =>
         }
         val msg = condition.v.msg
@@ -335,7 +337,8 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
             handler.logtn(left, right)
             val inner = handler.inner
             val (canConform, subst) = Conformance.conformsInner(left, right, handler = Some(inner))
-            val values = Seq(Value(Relation.Conformance(left, right, inner.conditions)))
+            val conformance = Relation.Conformance(left, right, inner.conditions)
+            val values = Seq(Value(if (true) DebugConformanceAdapter(conformance) else conformance))
             showPopup(values)
             println(inner.conditions)
             if (canConform) {
