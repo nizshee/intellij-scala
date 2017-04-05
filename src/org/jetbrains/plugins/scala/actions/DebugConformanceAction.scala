@@ -12,21 +12,25 @@ import com.intellij.openapi.editor.Editor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.{JBPopup, JBPopupFactory}
 import com.intellij.openapi.util.Disposer
+import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiUtilBase
-import com.intellij.psi.{PsiElement, PsiNamedElement, PsiWhiteSpace}
+import com.intellij.psi.{PsiElement, PsiMethod, PsiNamedElement, PsiWhiteSpace}
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.treeStructure.Tree
+import org.jetbrains.plugins.scala.actions.DebugConformanceAction.{CHandler, SHandler}
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
-import org.jetbrains.plugins.scala.lang.psi.api.base.{ScFieldId, ScLiteral}
-import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.ScBindingPattern
-import org.jetbrains.plugins.scala.lang.psi.api.expr.{ScExpression, ScMethodCall}
+import org.jetbrains.plugins.scala.lang.psi.api.base.{ScFieldId, ScLiteral, ScMethodLike, ScReferenceElement}
+import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.{ScBindingPattern, ScPatternArgumentList}
+import org.jetbrains.plugins.scala.lang.psi.api.expr.{ScArgumentExprList, ScExpression, ScMethodCall}
 import org.jetbrains.plugins.scala.lang.psi.api.statements.params.ScParameter
 import org.jetbrains.plugins.scala.lang.psi.types.api.designator.{ScDesignatorType, ScProjectionType, ScThisType}
 import org.jetbrains.plugins.scala.lang.psi.types.api.{JavaArrayType, ParameterizedType, StdType, TypeParameterType, TypeSystem, UndefinedType}
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.{ScMethodType, ScTypePolymorphicType}
 import org.jetbrains.plugins.scala.lang.psi.types.result.{Failure, Success}
-import org.jetbrains.plugins.scala.lang.psi.types.{Conformance, ScType}
+import org.jetbrains.plugins.scala.lang.psi.types.{Compatibility, Conformance, ScSubstitutor, ScType, ScUndefinedSubstitutor}
 import org.jetbrains.plugins.scala.lang.refactoring.util.ScalaRefactoringUtil
+import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
+import org.jetbrains.plugins.scala.lang.resolve.processor.MethodResolveProcessor
 
 
 object DebugConformanceAction {
@@ -84,7 +88,24 @@ object DebugConformanceAction {
   }
 
   class CHandler {
+    def log(any: Any): Unit = println(any)
+    def logn(any: Any): Unit = {
+      println(any)
+      println()
+    }
 
+    def logCase(any: Any): Unit = {
+      println("case - " + any)
+      println()
+    }
+  }
+
+  class SHandler {
+    def log(any: Any): Unit = println(any)
+    def logn(any: Any): Unit = {
+      println(any)
+      println()
+    }
   }
 
 }
@@ -149,28 +170,25 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
       val elements = ScalaRefactoringUtil.selectedElements(editor, file.asInstanceOf[ScalaFile], trimComments = false)
 
-      elements.foreach {
-        case m: ScMethodCall => println(m.getType())
+      // TODO need to handle arguments somehow, not only functions
+      elements.foreach { // TODO how to handle dsl style like a + b
+        case m: ScMethodCall =>
+          m.deepestInvokedExpr match {
+            case r: ScReferenceElement =>
+              val rrOption = r.bind()
+              rrOption.flatMap(_.innerResolveResult).orElse(rrOption) match {
+                case Some(rr) => processScResolveRes(m.args.exprs, rr, m.getResolveScope)
+                case _ =>
+              }
+            case _ =>
+          }
         case _ =>
       }
-      println(elements)
-//      elements.foreach {
-//        case e: ScNewTemplateDefinition =>
-//          processScExpr(e)
-//        case p: ScPatternDefinition => p match {
-//          case ScPatternDefinition.expr(e) =>
-//            processScExpr(e)
-//          case _ =>
-//            println("1")
-//        }
-//        case _ =>
-//          println("2", e)
-//      }
 
-      opt match {
-        case Some((expr, _)) => processScExpr(expr)
-        case _ => showHint("No expression found.")
-      }
+//      opt match {
+//        case Some((expr, _)) => processScExpr(expr)
+//        case _ => showHint("No expression found.")
+//      }
     } else {
       println("TODO")
       val offset = editor.getCaretModel.getOffset
@@ -186,13 +204,34 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     }
   }
 
+  // TODO check how works with implicits
+  private def processScResolveRes(args: Seq[ScExpression], rr: ScalaResolveResult, scope: GlobalSearchScope) = {
+    val handler = new CHandler
+
+    val argExprs = args.map(Compatibility.Expression.apply) // TODO how to handle many parrents?
+    val element = rr.getActualElement
+    val s = rr.substitutor
+    val subs = MethodResolveProcessor.undefinedSubstitutor(element, s, false, Seq()) // TODO maybe typeArgElements is necessary
+    val c = Compatibility.compatible(element, subs, List(argExprs), false, scope, false, handler = Some(handler))
+    val sHandler = new SHandler
+    c.undefSubst.getSubstitutorWithBounds(notNonable = true, handler = Some(sHandler)) match {
+      case Some((substitutor, _, _)) =>
+        println(substitutor)
+      case None =>
+    }
+
+    c.problems.foreach { p =>
+      println(p.description)
+    }
+  }
+
 
   private def processScExpr(e: ScExpression)(implicit editor: Editor): Unit = {
     implicit val typeSystem: TypeSystem = e.typeSystem
+    val handler = new DebugConformanceAction.Handler()
 
     val leftOption = e.expectedType()
     val rightTypeResult = e.getNonValueType().map(_.inferValueType)
-    val handler = new DebugConformanceAction.Handler()
     leftOption match {
       case Some(left) => // TODO get fresh type variable if expected not found
         rightTypeResult match {

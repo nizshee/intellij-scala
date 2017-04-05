@@ -224,7 +224,12 @@ object MethodResolveProcessor {
           !f.paramClauses.clauses.apply(1).isImplicit =>
           problems += ExpectedTypeMismatch //do not check expected types for more than one param clauses
           Nothing
-        case f: ScFunction => substitutor.subst(f.returnType.getOrNothing)
+        case f: ScFunction =>
+          val ti = tempSubstitutor
+          val s = realResolveResult.substitutor
+          val t = f.returnType
+          val st = substitutor.subst(t.getOrNothing)
+          substitutor.subst(f.returnType.getOrNothing)
         case f: ScFun => substitutor.subst(f.retType)
         case m: PsiMethod =>
           Option(m.getReturnType).map { rt =>

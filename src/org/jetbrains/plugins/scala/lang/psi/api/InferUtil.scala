@@ -375,7 +375,7 @@ object InferUtil {
     val paramsWithUndefTypes = params.map(p => p.copy(paramType = s.subst(p.paramType),
       expectedType = abstractSubst.subst(p.paramType)))
     val c = Compatibility.checkConformanceExt(checkNames = true, paramsWithUndefTypes, exprs, checkWithImplicits = true,
-      isShapesResolve = false)
+      isShapesResolve = false, handler = None)
     val tpe = if (c.problems.isEmpty) {
       var un: ScUndefinedSubstitutor = c.undefSubst
       val subst = c.undefSubst

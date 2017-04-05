@@ -9,6 +9,7 @@ import com.intellij.psi._
 import com.intellij.psi.impl.compiled.ClsParameterImpl
 import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.annotations.TestOnly
+import org.jetbrains.plugins.scala.actions.DebugConformanceAction
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api.InferUtil
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
@@ -127,7 +128,7 @@ object Compatibility {
                        parameters: Seq[Parameter],
                        exprs: Seq[Expression],
                        checkWithImplicits: Boolean): (Boolean, ScUndefinedSubstitutor) = {
-    val r = checkConformanceExt(checkNames, parameters, exprs, checkWithImplicits, isShapesResolve = false)
+    val r = checkConformanceExt(checkNames, parameters, exprs, checkWithImplicits, isShapesResolve = false, handler = None)
     (r.problems.isEmpty, r.undefSubst)
   }
 
@@ -169,13 +170,14 @@ object Compatibility {
                           parameters: Seq[Parameter],
                           exprs: Seq[Expression],
                           checkWithImplicits: Boolean,
-                          isShapesResolve: Boolean): ConformanceExtResult = {
+                          isShapesResolve: Boolean,
+                          handler: Option[DebugConformanceAction.CHandler]): ConformanceExtResult = {
     ProgressManager.checkCanceled()
     var undefSubst = ScUndefinedSubstitutor()
 
     val clashedAssignments = clashedAssignmentsIn(exprs)
 
-    if(clashedAssignments.nonEmpty) {
+    if (clashedAssignments.nonEmpty) {
       val problems = clashedAssignments.map(ParameterSpecifiedMultipleTimes(_))
       return ConformanceExtResult(problems)
     }
@@ -364,7 +366,7 @@ object Compatibility {
           param.defaultType match {
             case Some(defaultTp) if defaultTp.conforms(paramType) =>
               defaultExpr.foreach(expr => matched ::= (param, expr))
-              matchedTypes ::=(param, defaultTp)
+              matchedTypes ::= (param, defaultTp)
               undefSubst += defaultTp.conforms(paramType, ScUndefinedSubstitutor())._2
             case Some(defaultTp) =>
                 return ConformanceExtResult(Seq(DefaultTypeParameterMismatch(defaultTp, paramType)), undefSubst,
@@ -400,23 +402,37 @@ object Compatibility {
                  checkWithImplicits: Boolean,
                  scope: GlobalSearchScope,
                  isShapesResolve: Boolean,
-                 ref: PsiElement = null): ConformanceExtResult = {
+                 ref: PsiElement = null,
+                 handler: Option[DebugConformanceAction.CHandler] = None): ConformanceExtResult = {
     val exprs: Seq[Expression] = argClauses.headOption match {case Some(seq) => seq case _ => Seq.empty}
     named match {
       case synthetic: ScSyntheticFunction =>
+        handler.foreach { h =>
+          h.logCase("ScSyntheticFunction")
+        }
         if (synthetic.paramClauses.isEmpty)
           return ConformanceExtResult(Seq(new DoesNotTakeParameters))
 
         checkConformanceExt(checkNames = false, parameters = synthetic.paramClauses.head.map { p =>
           p.copy(paramType = substitutor.subst(p.paramType))
-        }, exprs = exprs, checkWithImplicits = checkWithImplicits, isShapesResolve = isShapesResolve)
+        }, exprs = exprs, checkWithImplicits = checkWithImplicits, isShapesResolve = isShapesResolve, handler = handler)
       case fun: ScFunction =>
-        if(!fun.hasParameterClause && argClauses.nonEmpty)
+        handler.foreach { h =>
+          h.logCase("ScFunction")
+        }
+        if(!fun.hasParameterClause && argClauses.nonEmpty) {
+          handler.foreach { h =>
+            h.logn("strange condition with parameters and args failed; interrupt")
+          }
           return ConformanceExtResult(Seq(new DoesNotTakeParameters))
+        }
 
         if (QuasiquoteInferUtil.isMetaQQ(fun) && ref.isInstanceOf[ScReferenceExpression]) {
+          handler.foreach { h =>
+            h.logn("some metaprogramming")
+          }
           val params = QuasiquoteInferUtil.getMetaQQExpectedTypes(ref.asInstanceOf[ScReferenceExpression])
-          return checkConformanceExt(checkNames = false, params, exprs, checkWithImplicits, isShapesResolve)
+          return checkConformanceExt(checkNames = false, params, exprs, checkWithImplicits, isShapesResolve, handler = handler)
         }
 
         val parameters: Seq[ScParameter] = fun.effectiveParameterClauses.headOption.toList.flatMap(_.effectiveParameters)
@@ -447,9 +463,12 @@ object Compatibility {
         }
 
         val res = checkConformanceExt(checkNames = true, parameters = params,
-          exprs = exprs, checkWithImplicits = checkWithImplicits, isShapesResolve = isShapesResolve)
+          exprs = exprs, checkWithImplicits = checkWithImplicits, isShapesResolve = isShapesResolve, handler = handler)
         res
       case constructor: ScPrimaryConstructor =>
+        handler.foreach { h =>
+          h.logCase("ScPrimaryConstructor")
+        }
         val parameters: Seq[ScParameter] = constructor.effectiveFirstParameterSection
 
         val clashedAssignments = clashedAssignmentsIn(exprs)
@@ -484,10 +503,13 @@ object Compatibility {
 
         val res = checkConformanceExt(checkNames = true, parameters = parameters.map {
           param: ScParameter => toParameter(param, substitutor)
-        }, exprs = exprs, checkWithImplicits = checkWithImplicits, isShapesResolve = isShapesResolve)
+        }, exprs = exprs, checkWithImplicits = checkWithImplicits, isShapesResolve = isShapesResolve, handler = handler)
         res
 
       case method: PsiMethod =>
+        handler.foreach { h =>
+          h.logCase("PsiMethod")
+        }
         val parameters: Seq[PsiParameter] = method.parameters
 
         val excess = exprs.length - parameters.length
@@ -506,9 +528,13 @@ object Compatibility {
 
         checkConformanceExt(checkNames = false, parameters = parameters.map { param =>
           Parameter(substitutor.subst(param.paramType()), isRepeated = param.isVarArgs, index = -1)
-        }, exprs = exprs, checkWithImplicits = checkWithImplicits, isShapesResolve = isShapesResolve)
+        }, exprs = exprs, checkWithImplicits = checkWithImplicits, isShapesResolve = isShapesResolve, handler = handler)
 
-      case _ => ConformanceExtResult(Seq(new ApplicabilityProblem("22")))
+      case _ =>
+        handler.foreach { h =>
+          h.logn("no case found - 22")
+        }
+        ConformanceExtResult(Seq(new ApplicabilityProblem("22")))
     }
   }
 }
