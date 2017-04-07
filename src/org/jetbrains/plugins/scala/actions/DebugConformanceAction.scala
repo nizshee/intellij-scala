@@ -35,7 +35,7 @@ import org.jetbrains.plugins.scala.lang.resolve.processor.MethodResolveProcessor
 
 object DebugConformanceAction {
 
-  class Handler(nesting: Int = 0) {
+  class Handler(debug: Boolean, nesting: Int = 0) {
 
     private val offset = nesting * 1
     private val delimeter = if (offset < 1) "" else "|" * (offset - 1) + "|"
@@ -54,40 +54,54 @@ object DebugConformanceAction {
 
     def relations: Seq[ConformanceCondition.Variance] = _variances
 
-    def log(any: Any): Unit = println(delimeter + any)
+    def log(any: Any): Unit = if (debug) println(delimeter + any)
 
-    def logn(any: Any): Unit = {
+    def logn(any: Any): Unit = if (debug) {
       println(delimeter + any)
       println(delimeter)
     }
 
-    def logt(left: ScType, right: ScType): Unit = {
+    def logt(left: ScType, right: ScType): Unit = if (debug) {
       println(delimeter + s"left: ${left.presentableText}")
       println(delimeter + s"right: ${right.presentableText}")
     }
 
-    def logtn(left: ScType, right: ScType): Unit = {
+    def logtn(left: ScType, right: ScType): Unit = if (debug) {
       println(delimeter + s"left: ${left.presentableText}")
       println(delimeter + s"right: ${right.presentableText}")
       println(delimeter)
     }
 
-    def visit(any: Any): Unit = {
+    def visit(any: Any): Unit = if (debug) {
       println(delimeter + "visit " + any)
       println(delimeter)
     }
 
-    def rvisit(any: Any): Unit = {
+    def rvisit(any: Any): Unit = if (debug) {
       println(delimeter + "right visit " + any)
       println(delimeter)
     }
 
 
-    def inner: Handler =  new Handler(nesting + 1)
+    def inner: Handler =  new Handler(debug, nesting + 1)
 
   }
 
   class CHandler {
+    case class Arg(name: String, expectedType: ScType, actualType: ScType, undefinedSubstitutor: ScUndefinedSubstitutor)
+
+    private var _args: Seq[Arg] = Seq()
+
+    def +(name: String, expected: ScType, actual: ScType, undefinedSubstitutor: ScUndefinedSubstitutor): Arg = {
+      val arg = Arg(name, expected, actual, undefinedSubstitutor)
+      _args :+= arg
+      arg
+    }
+
+    def handler: Handler = new Handler(false)
+
+    def args: Seq[Arg] = _args
+
     def log(any: Any): Unit = println(any)
     def logn(any: Any): Unit = {
       println(any)
@@ -169,9 +183,24 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
 
       val elements = ScalaRefactoringUtil.selectedElements(editor, file.asInstanceOf[ScalaFile], trimComments = false)
+      println(elements)
 
       // TODO need to handle arguments somehow, not only functions
       elements.foreach { // TODO how to handle dsl style like a + b
+        case e: ScExpression =>
+          e.getContext.getContext match {
+            case m: ScMethodCall =>
+              m.deepestInvokedExpr match {
+                case r: ScReferenceElement =>
+                  val rrOption = r.bind()
+                  rrOption.flatMap(_.innerResolveResult).orElse(rrOption) match {
+                    case Some(rr) => processScResolveRes(m.args.exprs, rr, m.getResolveScope)
+                    case _ =>
+                  }
+              }
+            case c => println(s"not method - $c")
+          }
+          println(e)
         case m: ScMethodCall =>
           m.deepestInvokedExpr match {
             case r: ScReferenceElement =>
@@ -212,7 +241,9 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     val element = rr.getActualElement
     val s = rr.substitutor
     val subs = MethodResolveProcessor.undefinedSubstitutor(element, s, false, Seq()) // TODO maybe typeArgElements is necessary
+    println(s"begining subs is $subs")
     val c = Compatibility.compatible(element, subs, List(argExprs), false, scope, false, handler = Some(handler))
+    println(handler.args)
     val sHandler = new SHandler
     c.undefSubst.getSubstitutorWithBounds(notNonable = true, handler = Some(sHandler)) match {
       case Some((substitutor, _, _)) =>
@@ -228,7 +259,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
   private def processScExpr(e: ScExpression)(implicit editor: Editor): Unit = {
     implicit val typeSystem: TypeSystem = e.typeSystem
-    val handler = new DebugConformanceAction.Handler()
+    val handler = new DebugConformanceAction.Handler(true)
 
     val leftOption = e.expectedType()
     val rightTypeResult = e.getNonValueType().map(_.inferValueType)

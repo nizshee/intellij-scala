@@ -209,6 +209,7 @@ object Compatibility {
     var matchedTypes: List[(Parameter, ScType)] = Nil
     var defaultParameterUsed = false
 
+    // TODO? a lot of cases for now only primary path - arguments without names
     def doNoNamed(expr: Expression): List[ApplicabilityProblem] = {
       if (namedMode) {
         List(PositionalAfterNamedArgument(expr.expr))
@@ -224,12 +225,18 @@ object Compatibility {
         typeResult.toOption match {
           case None => Nil
           case Some(exprType) =>
-            val conforms = exprType.weakConforms(paramType)
+            val conforms = exprType.weakConforms(paramType) // TODO? calculates two times
             matched ::=(param, expr.expr)
             matchedTypes ::=(param, exprType)
             if (!conforms) List(TypeMismatch(expr.expr, paramType))
             else {
-              undefSubst += exprType.conforms(paramType, ScUndefinedSubstitutor(), checkWeak = true)._2
+              handler.foreach { h =>
+                h.log(s"find constaints to $exprType >: $paramType")
+                val (_, subst) = typeSystem.conformance.conformsInner(exprType, paramType,
+                  substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = Some(h.handler))
+                h + (param.name, exprType, paramType, subst)
+              }
+              undefSubst += exprType.conforms(paramType, ScUndefinedSubstitutor(), checkWeak = true)._2 // TODO? we really try to conform expected type to exprType?
               List.empty
             }
         }
