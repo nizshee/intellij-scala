@@ -9,7 +9,7 @@ import com.intellij.psi._
 import com.intellij.psi.impl.compiled.ClsParameterImpl
 import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.annotations.TestOnly
-import org.jetbrains.plugins.scala.actions.DebugConformanceAction
+import org.jetbrains.plugins.scala.actions.{DCHandler, DebugConformanceAction}
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api.InferUtil
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
@@ -171,7 +171,7 @@ object Compatibility {
                           exprs: Seq[Expression],
                           checkWithImplicits: Boolean,
                           isShapesResolve: Boolean,
-                          handler: Option[DebugConformanceAction.CHandler]): ConformanceExtResult = {
+                          handler: Option[DCHandler.Compatibility]): ConformanceExtResult = {
     ProgressManager.checkCanceled()
     var undefSubst = ScUndefinedSubstitutor()
 
@@ -410,7 +410,7 @@ object Compatibility {
                  scope: GlobalSearchScope,
                  isShapesResolve: Boolean,
                  ref: PsiElement = null,
-                 handler: Option[DebugConformanceAction.CHandler] = None): ConformanceExtResult = {
+                 handler: Option[DCHandler.Compatibility] = None): ConformanceExtResult = {
     val exprs: Seq[Expression] = argClauses.headOption match {case Some(seq) => seq case _ => Seq.empty}
     named match {
       case synthetic: ScSyntheticFunction =>

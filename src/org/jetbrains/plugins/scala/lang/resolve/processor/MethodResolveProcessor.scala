@@ -137,8 +137,14 @@ class MethodResolveProcessor(override val ref: PsiElement,
 
   override def candidatesS: Set[ScalaResolveResult] = {
     if (isDynamic) {
+      handler.foreach { h =>
+        h.log("is dynamic")
+      }
       collectCandidates(super.candidatesS.map(_.copy(isDynamic = true))).filter(_.isApplicable())
     } else {
+      handler.foreach { h =>
+        h.log("not dynamic -- super.candidates contains; instrument collectCandidates")
+      }
       collectCandidates(super.candidatesS)
     }
   }
@@ -229,7 +235,7 @@ object MethodResolveProcessor {
           val s = realResolveResult.substitutor
           val t = f.returnType
           val st = substitutor.subst(t.getOrNothing)
-          substitutor.subst(f.returnType.getOrNothing)
+          substitutor.subst(f.returnType.getOrNothing) // TODO break point here
         case f: ScFun => substitutor.subst(f.retType)
         case m: PsiMethod =>
           Option(m.getReturnType).map { rt =>

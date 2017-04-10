@@ -6,7 +6,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Computable
 import com.intellij.psi.PsiClass
 import com.intellij.util.containers.ContainerUtil
-import org.jetbrains.plugins.scala.actions.{ConformanceCondition, DebugConformanceAction}
+import org.jetbrains.plugins.scala.actions.{ConformanceCondition, DCHandler, DebugConformanceAction}
 import org.jetbrains.plugins.scala.caches.RecursionManager
 import org.jetbrains.plugins.scala.lang.psi.types._
 
@@ -31,7 +31,7 @@ trait Conformance extends TypeSystemOwner {
   final def conformsInner(left: ScType, right: ScType,
                           visited: Set[PsiClass] = Set.empty,
                           substitutor: ScUndefinedSubstitutor = ScUndefinedSubstitutor(),
-                          checkWeak: Boolean = false, handler: Option[DebugConformanceAction.Handler] = None): Result = {
+                          checkWeak: Boolean = false, handler: Option[DCHandler.Conformance] = None): Result = {
     ProgressManager.checkCanceled()
 
     if (left.equiv(Any) || right.equiv(Nothing)) {
@@ -67,5 +67,5 @@ trait Conformance extends TypeSystemOwner {
 
   protected def computable(left: ScType, right: ScType,
                            visited: Set[PsiClass],
-                           checkWeak: Boolean, handler: Option[DebugConformanceAction.Handler]): Computable[(Boolean, ScUndefinedSubstitutor)]
+                           checkWeak: Boolean, handler: Option[DCHandler.Conformance]): Computable[(Boolean, ScUndefinedSubstitutor)]
 }

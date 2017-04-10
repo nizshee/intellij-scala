@@ -7,6 +7,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Key
 import com.intellij.psi._
 import com.intellij.psi.scope._
+import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api._
 import org.jetbrains.plugins.scala.lang.psi.api.base.types.ScTypeProjection
@@ -50,6 +51,7 @@ object BaseProcessor {
 abstract class BaseProcessor(val kinds: Set[ResolveTargets.Value])
                             (implicit val typeSystem: TypeSystem) extends PsiScopeProcessor {
   protected val candidatesSet: mutable.HashSet[ScalaResolveResult] = new mutable.HashSet[ScalaResolveResult]
+  protected val handler: Option[DCHandler.Resolver] = None
 
   def isImplicitProcessor: Boolean = false
 

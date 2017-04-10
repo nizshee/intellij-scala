@@ -1,7 +1,7 @@
 package org.jetbrains.plugins.scala.lang.psi.types
 
 import org.jetbrains.plugins.dotty.lang.psi.types.DottyTypeSystem
-import org.jetbrains.plugins.scala.actions.DebugConformanceAction
+import org.jetbrains.plugins.scala.actions.{DCHandler, DebugConformanceAction}
 import org.jetbrains.plugins.scala.lang.psi.types.api._
 
 sealed trait ScUndefinedSubstitutor {
@@ -21,7 +21,7 @@ sealed trait ScUndefinedSubstitutor {
   def names: Set[Name]
 
   //subst, lowers, uppers
-  def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DebugConformanceAction.SHandler] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])]
+  def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])]
 }
 
 object ScUndefinedSubstitutor {
@@ -180,7 +180,7 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
     upperMap.keySet ++ lowerMap.filter(_._2.exists(!_.equiv(Nothing))).keySet ++ additionalNames
   }
 
-  def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DebugConformanceAction.SHandler] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] = {
+  def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] = {
     var tvMap = Map.empty[Name, ScType]
     var lMap = Map.empty[Name, ScType]
     var uMap = Map.empty[Name, ScType]
@@ -416,7 +416,7 @@ class ScMultiUndefinedSubstitutor(val subs: Seq[ScUndefinedSubstitutor]) extends
   override def addUpper(name: (String, Long), _upper: ScType, additional: Boolean, variance: Int): ScUndefinedSubstitutor =
     copy(subs.map(_.addUpper(name, _upper, additional, variance)))
 
-  override def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DebugConformanceAction.SHandler] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] =
+  override def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] =
     subs.map(_.getSubstitutorWithBounds(notNonable)).find(_.isDefined).getOrElse(None)
 
   override def filter(fun: (((String, Long), Set[ScType])) => Boolean): ScUndefinedSubstitutor =

@@ -1,126 +1,33 @@
 package org.jetbrains.plugins.scala.actions
 
 import java.awt.{BorderLayout, Dimension}
-import java.util
 import javax.swing.JPanel
 import javax.swing.tree.{DefaultMutableTreeNode, DefaultTreeModel}
 
-import com.intellij.ide.projectView.PresentationData
-import com.intellij.ide.util.treeView.{AbstractTreeBuilder, AbstractTreeNode, AbstractTreeStructure, NodeDescriptor}
+import com.intellij.ide.util.treeView.{AbstractTreeBuilder, AbstractTreeStructure}
 import com.intellij.openapi.actionSystem.{AnAction, AnActionEvent, CommonDataKeys}
 import com.intellij.openapi.editor.Editor
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.{JBPopup, JBPopupFactory}
 import com.intellij.openapi.util.Disposer
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiUtilBase
-import com.intellij.psi.{PsiElement, PsiMethod, PsiNamedElement, PsiWhiteSpace}
+import com.intellij.psi.{PsiElement, PsiNamedElement, PsiWhiteSpace}
 import com.intellij.ui.ScrollPaneFactory
 import com.intellij.ui.treeStructure.Tree
-import org.jetbrains.plugins.scala.actions.DebugConformanceAction.{CHandler, SHandler}
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
-import org.jetbrains.plugins.scala.lang.psi.api.base.{ScFieldId, ScLiteral, ScMethodLike, ScReferenceElement}
-import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.{ScBindingPattern, ScPatternArgumentList}
-import org.jetbrains.plugins.scala.lang.psi.api.expr.{ScArgumentExprList, ScExpression, ScMethodCall}
-import org.jetbrains.plugins.scala.lang.psi.api.statements.params.ScParameter
-import org.jetbrains.plugins.scala.lang.psi.types.api.designator.{ScDesignatorType, ScProjectionType, ScThisType}
-import org.jetbrains.plugins.scala.lang.psi.types.api.{JavaArrayType, ParameterizedType, StdType, TypeParameterType, TypeSystem, UndefinedType}
-import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.{ScMethodType, ScTypePolymorphicType}
+import org.jetbrains.plugins.scala.lang.psi.api.base.ScReferenceElement
+import org.jetbrains.plugins.scala.lang.psi.api.expr.{ScExpression, ScMethodCall, ScReferenceExpression}
+import org.jetbrains.plugins.scala.lang.psi.types.api.TypeSystem
 import org.jetbrains.plugins.scala.lang.psi.types.result.{Failure, Success}
-import org.jetbrains.plugins.scala.lang.psi.types.{Compatibility, Conformance, ScSubstitutor, ScType, ScUndefinedSubstitutor}
+import org.jetbrains.plugins.scala.lang.psi.types.{Compatibility, Conformance, ScType, ScUndefinedSubstitutor}
 import org.jetbrains.plugins.scala.lang.refactoring.util.ScalaRefactoringUtil
-import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
 import org.jetbrains.plugins.scala.lang.resolve.processor.MethodResolveProcessor
+import org.jetbrains.plugins.scala.lang.resolve.{ReferenceExpressionResolver, ScalaResolveResult}
 
 
 object DebugConformanceAction {
 
-  class Handler(debug: Boolean, nesting: Int = 0) {
 
-    private val offset = nesting * 1
-    private val delimeter = if (offset < 1) "" else "|" * (offset - 1) + "|"
-
-    private var _conditions: Seq[ConformanceCondition] = Seq()
-    private var _variances: Seq[ConformanceCondition.Variance] = Seq()
-
-    def +(condition: ConformanceCondition): ConformanceCondition = {
-      _conditions :+= condition
-      condition
-    }
-
-    def +(variance: ConformanceCondition.Variance): Unit = _variances :+= variance
-
-    def conditions: Seq[ConformanceCondition] = _conditions
-
-    def relations: Seq[ConformanceCondition.Variance] = _variances
-
-    def log(any: Any): Unit = if (debug) println(delimeter + any)
-
-    def logn(any: Any): Unit = if (debug) {
-      println(delimeter + any)
-      println(delimeter)
-    }
-
-    def logt(left: ScType, right: ScType): Unit = if (debug) {
-      println(delimeter + s"left: ${left.presentableText}")
-      println(delimeter + s"right: ${right.presentableText}")
-    }
-
-    def logtn(left: ScType, right: ScType): Unit = if (debug) {
-      println(delimeter + s"left: ${left.presentableText}")
-      println(delimeter + s"right: ${right.presentableText}")
-      println(delimeter)
-    }
-
-    def visit(any: Any): Unit = if (debug) {
-      println(delimeter + "visit " + any)
-      println(delimeter)
-    }
-
-    def rvisit(any: Any): Unit = if (debug) {
-      println(delimeter + "right visit " + any)
-      println(delimeter)
-    }
-
-
-    def inner: Handler =  new Handler(debug, nesting + 1)
-
-  }
-
-  class CHandler {
-    case class Arg(name: String, expectedType: ScType, actualType: ScType, undefinedSubstitutor: ScUndefinedSubstitutor)
-
-    private var _args: Seq[Arg] = Seq()
-
-    def +(name: String, expected: ScType, actual: ScType, undefinedSubstitutor: ScUndefinedSubstitutor): Arg = {
-      val arg = Arg(name, expected, actual, undefinedSubstitutor)
-      _args :+= arg
-      arg
-    }
-
-    def handler: Handler = new Handler(false)
-
-    def args: Seq[Arg] = _args
-
-    def log(any: Any): Unit = println(any)
-    def logn(any: Any): Unit = {
-      println(any)
-      println()
-    }
-
-    def logCase(any: Any): Unit = {
-      println("case - " + any)
-      println()
-    }
-  }
-
-  class SHandler {
-    def log(any: Any): Unit = println(any)
-    def logn(any: Any): Unit = {
-      println(any)
-      println()
-    }
-  }
 
 }
 
@@ -131,13 +38,10 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
   private def showHint(hint: String)(implicit editor: Editor) = ScalaActionUtil.showHint(editor, hint)
 
-  private def showPopup(values: Seq[Value])(implicit editor: Editor) = {
-    val project = editor.getProject
+  private def showPopup(treeStructure: AbstractTreeStructure)(implicit editor: Editor) = {
     val tree = new Tree()
 
-    val structure = new DebugConformanceTreeStructure(project, values)
-
-    val builder = new AbstractTreeBuilder(tree, new DefaultTreeModel(new DefaultMutableTreeNode), structure, null) {
+    val builder = new AbstractTreeBuilder(tree, new DefaultTreeModel(new DefaultMutableTreeNode), treeStructure, null) {
       override def isSmartExpand: Boolean = false
     }
 
@@ -187,6 +91,8 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
       // TODO need to handle arguments somehow, not only functions
       elements.foreach { // TODO how to handle dsl style like a + b
+        case e: ScReferenceExpression =>
+          processReferenceExpression(e)
         case e: ScExpression =>
           e.getContext.getContext match {
             case m: ScMethodCall =>
@@ -233,9 +139,18 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     }
   }
 
+  private def processReferenceExpression(reference: ScReferenceExpression)(implicit editor: Editor) = {
+    val handler = new DCHandler.Resolver
+    ReferenceExpressionResolver.resolve(reference, shapesOnly = false, incomplete = true,  handler = Some(handler))
+
+    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c))
+    showPopup(new DCTreeStructureResolver(editor.getProject, values))
+
+  }
+
   // TODO check how works with implicits
   private def processScResolveRes(args: Seq[ScExpression], rr: ScalaResolveResult, scope: GlobalSearchScope) = {
-    val handler = new CHandler
+    val handler = new DCHandler.Compatibility
 
     val argExprs = args.map(Compatibility.Expression.apply) // TODO how to handle many parrents?
     val element = rr.getActualElement
@@ -244,7 +159,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     println(s"begining subs is $subs")
     val c = Compatibility.compatible(element, subs, List(argExprs), false, scope, false, handler = Some(handler))
     println(handler.args)
-    val sHandler = new SHandler
+    val sHandler = new DCHandler.Substitutor
     c.undefSubst.getSubstitutorWithBounds(notNonable = true, handler = Some(sHandler)) match {
       case Some((substitutor, _, _)) =>
         println(substitutor)
@@ -259,7 +174,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
   private def processScExpr(e: ScExpression)(implicit editor: Editor): Unit = {
     implicit val typeSystem: TypeSystem = e.typeSystem
-    val handler = new DebugConformanceAction.Handler(true)
+    val handler = new DCHandler.Conformance(true)
 
     val leftOption = e.expectedType()
     val rightTypeResult = e.getNonValueType().map(_.inferValueType)
@@ -272,8 +187,8 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
             val inner = handler.inner
             val (canConform, subst) = Conformance.conformsInner(left, right, handler = Some(inner))
             val conformance = Relation.Conformance(left, right, inner.conditions)
-            val values = Seq(Value(if (true) DebugConformanceAdapter(conformance) else conformance))
-            showPopup(values)
+            val values = Seq(DCTreeStructureConformance.Value(if (true) DebugConformanceAdapter(conformance) else conformance))
+            showPopup(new DCTreeStructureConformance(editor.getProject, values))
             println(inner.conditions)
             if (canConform) {
               handler.logn("can conform")
