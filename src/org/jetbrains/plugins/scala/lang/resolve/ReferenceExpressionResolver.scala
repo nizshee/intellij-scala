@@ -127,20 +127,10 @@ object ReferenceExpressionResolver {
         override def candidatesS: Set[ScalaResolveResult] = {
           if (!smartProcessor) super.candidatesS
           else {
-            handler.foreach { h =>
-              h.log(super.candidatesS)
-            }
+            // TODO? strange method, it restarts ReferenceExpressionResolver with inclomplete = true
             val iterator = reference.shapeResolve.map(_.asInstanceOf[ScalaResolveResult]).iterator
             while (iterator.hasNext) {
               levelSet.add(iterator.next())
-            }
-            handler.foreach { h =>
-              val i = levelSet.iterator()
-              while (i.hasNext) {
-                val rr = i.next()
-                h + rr.asInstanceOf[ScalaResolveResult]
-                h.log(rr.getElement.getNode.getText)
-              }
             }
             super.candidatesS
           }
@@ -150,14 +140,14 @@ object ReferenceExpressionResolver {
     var result: Array[ResolveResult] = Array.empty
     if (shapesOnly) {
       handler.foreach { h =>
-        h.log("shape only case")
+        h.log("shape only case - skip") // TODO? why shapes only - doResolve and main case not
       }
       result = doResolve(reference, processor(smartProcessor = false), handler = handler)
     } else {
       val candidatesS = processor(smartProcessor = true).candidatesS //let's try to avoid treeWalkUp
       if (candidatesS.isEmpty || candidatesS.forall(!_.isApplicable())) {
         handler.foreach { h =>
-          h.log("strange case")
+          h.log("strange case - skip")
         }
         // it has another resolve only in one case:
         // clazz.ref(expr)
@@ -167,9 +157,6 @@ object ReferenceExpressionResolver {
         // this is ugly, but it can improve performance
         result = doResolve(reference, processor(smartProcessor = false), handler = handler)
       } else {
-        handler.foreach { h =>
-          h.log("normal case")
-        }
         result = candidatesS.toArray
       }
     }
@@ -177,12 +164,15 @@ object ReferenceExpressionResolver {
       h.log(s"processor returned result ${result.toList}")
     }
     if (result.isEmpty && reference.isAssignmentOperator) {
+      handler.foreach { h =>
+        h.log("empty result + assignment operator - skip")
+      }
       val assignProcessor = new MethodResolveProcessor(reference, reference.refName.init, List(argumentsOf(reference)),
         Nil, prevInfoTypeParams, isShapeResolve = shapesOnly, enableTupling = true)
       result = doResolve(reference, assignProcessor, handler = handler)
       result.map(r => r.asInstanceOf[ScalaResolveResult].copy(isAssignment = true): ResolveResult)
     } else {
-      result
+      result // TODO? no doResolve in main path?
     }
   }
 

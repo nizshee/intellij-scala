@@ -1,5 +1,6 @@
 package org.jetbrains.plugins.scala.actions
 
+import com.intellij.psi.PsiNamedElement
 import org.jetbrains.plugins.scala.lang.psi.types.{ScType, ScUndefinedSubstitutor}
 import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
 
@@ -95,17 +96,28 @@ object DCHandler {
   }
 
   class Resolver {
-    case class Candidate(rr: ScalaResolveResult)
+    case class Candidate(rr: Option[ScalaResolveResult])
+    private var candidatesList: List[(PsiNamedElement, Candidate)] = List.empty
 
-    private var _candidates = Seq.empty[Candidate]
-
-    def +(rr: ScalaResolveResult): Candidate = {
-      val candidate = Candidate(rr)
-      _candidates :+= candidate
+    def +(el: PsiNamedElement): Candidate = {
+      val candidate = Candidate(None)
+      candidatesList ::= (el -> candidate)
       candidate
     }
 
-    def candidates: Seq[Candidate] = _candidates
+    def +(rr: ScalaResolveResult) = {
+      candidatesList match {
+        case (el, candidate) :: tail =>
+          candidatesList = el -> candidate.copy(rr = Some(rr)) :: tail
+        case _ =>
+      }
+    }
+
+//    def clear(): Unit = {
+//      candidatesList = List.empty
+//    }
+
+    def candidates: List[(PsiNamedElement, Candidate)] = candidatesList
 
     def log(any: Any): Unit = println(any)
     def logn(any: Any): Unit = {

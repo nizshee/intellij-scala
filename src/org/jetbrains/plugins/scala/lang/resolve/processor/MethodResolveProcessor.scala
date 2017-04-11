@@ -136,25 +136,37 @@ class MethodResolveProcessor(override val ref: PsiElement,
 
 
   override def candidatesS: Set[ScalaResolveResult] = {
+
     if (isDynamic) {
       handler.foreach { h =>
-        h.log("is dynamic")
+        h.log("is dynamic - skip")
       }
       collectCandidates(super.candidatesS.map(_.copy(isDynamic = true))).filter(_.isApplicable())
     } else {
       handler.foreach { h =>
-        h.log("not dynamic -- super.candidates contains; instrument collectCandidates")
+        h.log(s"not dynamic -- super.candidates contains ${super.candidatesS}; instrument collectCandidates")
       }
       collectCandidates(super.candidatesS)
     }
   }
 
   private def collectCandidates(input: Set[ScalaResolveResult]): Set[ScalaResolveResult] = {
-    if (input.isEmpty) return input
+    if (input.isEmpty) {
+      handler.foreach { h =>
+        h.log("no candidates found")
+      }
+      return input
+    }
     if (!isShapeResolve && enableTupling && argumentClauses.nonEmpty) {
       isShapeResolve = true
       val cand1 = MethodResolveProcessor.candidates(this, input)
+      handler.foreach { h =>
+        h.log(s"candidates afrer shape resolve $cand1")
+      }
       if (!isDynamic && (cand1.isEmpty || cand1.forall(_.tuplingUsed))) {
+        handler.foreach { h =>
+          h.log("shape resolve gives nothing && tupling case - skip")
+        }
         //tupling ok
         isShapeResolve = false
         val oldArg = argumentClauses
@@ -171,6 +183,9 @@ class MethodResolveProcessor(override val ref: PsiElement,
         res.map(r => r.copy(tuplingUsed = true))
       } else {
         isShapeResolve = false
+        handler.foreach { h =>
+          h.log("normal resolve")
+        }
         MethodResolveProcessor.candidates(this, input)
       }
     } else
@@ -577,12 +592,18 @@ object MethodResolveProcessor {
     }
 
     def mapper(applicationImplicits: Boolean): Set[ScalaResolveResult] = {
+      handler.foreach { h =>
+        h.log("mapper - skip")
+//        h.clear()
+      }
       val expanded = input.flatMap(expand).iterator
       var results = ArrayBuffer.empty[ScalaResolveResult]
 
       //problemsFor make all the work, wrapping it in scala collection API adds 9 unnecessary methods to the stacktrace
       while (expanded.hasNext) {
         val (r, cleanTypeArguments) = expanded.next()
+        handler.foreach(_.log(r.element.getNode.getText))
+        handler.foreach(_ + r.element)
         val typeArgElems = if (cleanTypeArguments) Seq.empty else typeArgElements
         val pr = problemsFor(r, applicationImplicits, ref, argumentClauses, typeArgElems, selfConstructorResolve,
           prevTypeInfo, expectedOption, isUnderscore, isShapeResolve)
@@ -593,6 +614,7 @@ object MethodResolveProcessor {
             r.copy(innerResolveResult = Some(innerCopy))
           case _ => r.copy(problems = pr.problems, defaultParameterUsed = pr.defaultParameterUsed, resultUndef = Some(pr.undefSubst))
         }
+        handler.foreach(_ + result)
         results += result
       }
 
@@ -604,13 +626,20 @@ object MethodResolveProcessor {
     if (filtered.isEmpty) filtered = mapped.filter(_.isApplicableInternal(withExpectedType = false))
 
     if (filtered.isEmpty && !noImplicitsForArgs) {
+      handler.foreach { h =>
+        h.log("try with implicits")
+      }
       //check with implicits
       mapped = mapper(applicationImplicits = true)
       filtered = mapped.filter(_.isApplicableInternal(withExpectedType = true))
       if (filtered.isEmpty) filtered = mapped.filter(_.isApplicableInternal(withExpectedType = false))
     }
 
-    val onlyValues = mapped.forall { r =>
+    handler.foreach { h =>
+      h.log(s"after filter $filtered")
+    }
+
+    val onlyValues = mapped.forall { r => // TODO? what it means
       r.element match {
         case _: ScFunction => false
         case _: ScReferencePattern if r.innerResolveResult.exists(_.element.getName == "apply") => true
@@ -636,6 +665,7 @@ object MethodResolveProcessor {
 
     //choose alternative with by name params
     if (argumentClauses.nonEmpty && filtered.size > 1 && !isShapeResolve) {
+      handler.foreach(_.log("alternative with by name params - skip"))
       argumentClauses.head.map(assignmemt => assignmemt.expr).
         collect { case assignment: ScAssignStmt => assignment.assignName }.foreach { listOfNames =>
 
@@ -651,10 +681,13 @@ object MethodResolveProcessor {
     }
 
     //remove default parameters alternatives
-    if (filtered.size > 1 && !isShapeResolve) filtered = filtered.filter(r => r.innerResolveResult match {
-      case Some(rr) => !rr.defaultParameterUsed
-      case None => !r.defaultParameterUsed
-    })
+    if (filtered.size > 1 && !isShapeResolve) {
+      handler.foreach(_.log("remove default params alternatives - skip"))
+      filtered = filtered.filter(r => r.innerResolveResult match {
+        case Some(rr) => !rr.defaultParameterUsed
+        case None => !r.defaultParameterUsed
+      })
+    }
 
     if (isShapeResolve) {
       if (filtered.isEmpty) {

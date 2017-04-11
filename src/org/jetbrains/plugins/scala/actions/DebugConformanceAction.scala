@@ -141,9 +141,9 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
   private def processReferenceExpression(reference: ScReferenceExpression)(implicit editor: Editor) = {
     val handler = new DCHandler.Resolver
-    ReferenceExpressionResolver.resolve(reference, shapesOnly = false, incomplete = true,  handler = Some(handler))
+    ReferenceExpressionResolver.resolve(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
 
-    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c))
+    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2))
     showPopup(new DCTreeStructureResolver(editor.getProject, values))
 
   }
