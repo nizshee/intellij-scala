@@ -56,7 +56,7 @@ object DCTreeStructureResolver {
       rr.problems.map { p =>
         new ProblemNode(project, ProblemValue(p.toString))
       }
-    }
+    }.toSeq
 
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
@@ -67,7 +67,7 @@ object DCTreeStructureResolver {
     override def update(presentationData: PresentationData): Unit = {
       val text = candidate.el.getNode.getText
       presentationData.setPresentableText(text)
-      if (problems.nonEmpty) presentationData.setAttributesKey(CodeInsightColors.ERRORS_ATTRIBUTES)
+      if (problems.nonEmpty) presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
   }
 
@@ -79,6 +79,7 @@ object DCTreeStructureResolver {
     override def update(presentationData: PresentationData): Unit = {
       presentationData.setPresentableText(problem.problem)
       presentationData.setAttributesKey(CodeInsightColors.ERRORS_ATTRIBUTES)
+      presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
   }
 }

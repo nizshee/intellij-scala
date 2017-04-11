@@ -113,9 +113,9 @@ object DCHandler {
       }
     }
 
-//    def clear(): Unit = {
-//      candidatesList = List.empty
-//    }
+    def clear(): Unit = {
+      candidatesList = List.empty
+    }
 
     def candidates: List[(PsiNamedElement, Candidate)] = candidatesList
 

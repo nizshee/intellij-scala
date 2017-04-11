@@ -594,7 +594,7 @@ object MethodResolveProcessor {
     def mapper(applicationImplicits: Boolean): Set[ScalaResolveResult] = {
       handler.foreach { h =>
         h.log("mapper - skip")
-//        h.clear()
+        h.clear()
       }
       val expanded = input.flatMap(expand).iterator
       var results = ArrayBuffer.empty[ScalaResolveResult]
@@ -716,6 +716,7 @@ object MethodResolveProcessor {
     else if (filtered.isEmpty) mapped
     else {
       val len = if (argumentClauses.isEmpty) 0 else argumentClauses.head.length
+      handler.foreach(_.log(s"filtered before MostSpecificUtil $filtered"))
       if (filtered.size == 1) return filtered
       MostSpecificUtil(ref, len).mostSpecificForResolveResult(filtered, hasTypeParametersCall = typeArgElements.nonEmpty) match {
         case Some(r) => Set(r)

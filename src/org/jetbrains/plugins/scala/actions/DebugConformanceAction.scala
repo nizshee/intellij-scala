@@ -143,9 +143,8 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     val handler = new DCHandler.Resolver
     ReferenceExpressionResolver.resolve(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
 
-    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2))
+    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2)) // TODO receives already shaped alternatives - magick
     showPopup(new DCTreeStructureResolver(editor.getProject, values))
-
   }
 
   // TODO check how works with implicits
