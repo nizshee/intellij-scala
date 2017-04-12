@@ -174,6 +174,7 @@ object Compatibility {
                           handler: Option[DCHandler.Compatibility]): ConformanceExtResult = {
     ProgressManager.checkCanceled()
     var undefSubst = ScUndefinedSubstitutor()
+    handler.foreach(_ + undefSubst)
 
     val clashedAssignments = clashedAssignmentsIn(exprs)
 
@@ -219,25 +220,26 @@ object Compatibility {
         used(getIt) = true
         val param: Parameter = parameters(getIt)
         val paramType = param.paramType
+        handler.foreach(_.log(s"doNoNamed for ${param.name}"))
         val expectedType = param.expectedType
         val typeResult =
           expr.getTypeAfterImplicitConversion(checkWithImplicits, isShapesResolve, Some(expectedType))._1
         typeResult.toOption match {
           case None => Nil
           case Some(exprType) =>
-            val conforms = exprType.weakConforms(paramType) // TODO? calculates two times
+            handler.foreach { h =>
+              h.log(s"find constaints to $exprType >: $paramType")
+              val cHandler = h.handler
+              val (_, subst) = typeSystem.conformance.conformsInner(exprType, paramType,
+                substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = Some(cHandler))
+              h + h.Arg(param.name, exprType, paramType, subst, cHandler.conditions)
+            }
+            val conforms = exprType.weakConforms(paramType) // TODO? calculates two times, i'll add third
             matched ::=(param, expr.expr)
             matchedTypes ::=(param, exprType)
             if (!conforms) List(TypeMismatch(expr.expr, paramType))
             else {
-              handler.foreach { h =>
-                h.log(s"find constaints to $exprType >: $paramType")
-                val cHandler = h.handler
-                val (_, subst) = typeSystem.conformance.conformsInner(exprType, paramType,
-                  substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = Some(cHandler))
-                h + h.Arg(param.name, exprType, paramType, subst, cHandler.conditions)
-              }
-              undefSubst += exprType.conforms(paramType, ScUndefinedSubstitutor(), checkWeak = true)._2 // TODO? we really try to conform expected type to exprType?
+              undefSubst += exprType.conforms(paramType, ScUndefinedSubstitutor(), checkWeak = true)._2
               List.empty
             }
         }
@@ -413,6 +415,7 @@ object Compatibility {
                  ref: PsiElement = null,
                  handler: Option[DCHandler.Compatibility] = None): ConformanceExtResult = {
     val exprs: Seq[Expression] = argClauses.headOption match {case Some(seq) => seq case _ => Seq.empty}
+    handler.foreach(_.log(s"compatibility ${named.getNode.getText}"))
     named match {
       case synthetic: ScSyntheticFunction =>
         handler.foreach(_.logCase("ScSyntheticFunction"))
@@ -425,12 +428,12 @@ object Compatibility {
       case fun: ScFunction =>
         handler.foreach(_.logCase("ScFunction"))
         if(!fun.hasParameterClause && argClauses.nonEmpty) {
-          handler.foreach(_.logn("strange condition with parameters and args failed; interrupt"))
+          handler.foreach(_.logn("strange condition with parameters and args failed - skip"))
           return ConformanceExtResult(Seq(new DoesNotTakeParameters))
         }
 
         if (QuasiquoteInferUtil.isMetaQQ(fun) && ref.isInstanceOf[ScReferenceExpression]) {
-          handler.foreach(_.logn("some metaprogramming"))
+          handler.foreach(_.logn("some metaprogramming - skip"))
           val params = QuasiquoteInferUtil.getMetaQQExpectedTypes(ref.asInstanceOf[ScReferenceExpression])
           return checkConformanceExt(checkNames = false, params, exprs, checkWithImplicits, isShapesResolve, handler = handler)
         }

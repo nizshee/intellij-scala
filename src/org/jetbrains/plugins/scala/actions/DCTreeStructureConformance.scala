@@ -10,14 +10,14 @@ import com.intellij.openapi.project.Project
 
 
 // TODO? project may be implicit val
-class DCTreeStructureConformance(project: Project, values: Seq[DCTreeStructureConformance.Value]) extends AbstractTreeStructure {
+class DCTreeStructureConformance(values: Seq[DCTreeStructureConformance.Value])(implicit project: Project) extends AbstractTreeStructure {
 
   import DCTreeStructureConformance._
 
   private class RootNode extends AbstractTreeNode[Any](project, ()) {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
-      values.foreach { value => list.add(new RelationNode(project, RelationValue(value.relation))) }
+      values.foreach { value => list.add(new RelationNode(RelationValue(value.relation))) }
       list
     }
 
@@ -29,7 +29,7 @@ class DCTreeStructureConformance(project: Project, values: Seq[DCTreeStructureCo
   override def getRootElement: AnyRef = new RootNode
 
   override def getChildElements(o: scala.Any): Array[AnyRef] = o match {
-    case _: RootNode => values.map(v => new RelationNode(project, RelationValue(v.relation))).toArray
+    case _: RootNode => values.map(v => new RelationNode(RelationValue(v.relation))).toArray
     case n: RelationNode =>
       val childrenImpl = n.getChildren
       childrenImpl.toArray(new Array[AnyRef](childrenImpl.size))
@@ -53,14 +53,14 @@ object DCTreeStructureConformance {
   case class RelationValue(v: Relation, prefix: String = "")
   case class ConditionValue(v: ConformanceCondition, prefix: String = "")
 
-  class RelationNode(project: Project, relation: RelationValue) extends AbstractTreeNode[RelationValue](project, relation) {
+  class RelationNode(relation: RelationValue)(implicit project: Project) extends AbstractTreeNode[RelationValue](project, relation) {
 
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
       relation.v match {
         case r: Relation.Conformance =>
           r.conditions.foreach { condition =>
-            list.add(new ConditionNode(project, ConditionValue(condition)))
+            list.add(new ConditionNode(ConditionValue(condition)))
           }
         case _ =>
 
@@ -83,32 +83,32 @@ object DCTreeStructureConformance {
 
   }
 
-  class ConditionNode(project: Project, condition: ConditionValue) extends AbstractTreeNode[ConditionValue](project, condition) {
+  class ConditionNode(condition: ConditionValue)(implicit project: Project) extends AbstractTreeNode[ConditionValue](project, condition) {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
       condition.v match {
         case c: ConformanceCondition.Equivalent =>
-          list.add(new RelationNode(project, RelationValue(c.equivalence)))
+          list.add(new RelationNode(RelationValue(c.equivalence)))
         case c: ConformanceCondition.Parametrize =>
-          c.equals.foreach(c => list.add(new RelationNode(project, RelationValue(c))))
+          c.equals.foreach(c => list.add(new RelationNode(RelationValue(c))))
           c.conform.foreach {
             case ConformanceCondition.Invariant(param, e) =>
-              list.add(new RelationNode(project, RelationValue(e, s"invariant $param")))
+              list.add(new RelationNode(RelationValue(e, s"invariant $param")))
             case ConformanceCondition.Covariant(param, e) =>
-              list.add(new RelationNode(project, RelationValue(e, s"covariant $param")))
+              list.add(new RelationNode(RelationValue(e, s"covariant $param")))
             case ConformanceCondition.Contrvariant(param, e) =>
-              list.add(new RelationNode(project, RelationValue(e, s"contrvariant $param")))
+              list.add(new RelationNode(RelationValue(e, s"contrvariant $param")))
           }
         case c: ConformanceCondition.Transitive =>
-          list.add(new RelationNode(project, RelationValue(c.lm)))
-          list.add(new RelationNode(project, RelationValue(c.mr)))
+          list.add(new RelationNode(RelationValue(c.lm)))
+          list.add(new RelationNode(RelationValue(c.mr)))
         case c: ConformanceCondition.Same =>
-          list.add(new RelationNode(project, RelationValue(c.relation)))
+          list.add(new RelationNode(RelationValue(c.relation)))
         case c: ConformanceCondition.Projection =>
-          list.add(new RelationNode(project, RelationValue(c.conforms)))
+          list.add(new RelationNode(RelationValue(c.conforms)))
         case c: ConformanceCondition.Method =>
-          c.ret.foreach(c => list.add(new RelationNode(project, RelationValue(c, "ret"))))
-          c.args.foreach(c => list.add(new RelationNode(project, RelationValue(c.relation, "arg"))))
+          c.ret.foreach(c => list.add(new RelationNode(RelationValue(c, "ret"))))
+          c.args.foreach(c => list.add(new RelationNode(RelationValue(c.relation, "arg"))))
         case _ =>
       }
       list
@@ -140,6 +140,8 @@ object DCTreeStructureConformance {
           s"abstract ${c.left} >: ${c.left.upper} <: ${c.left.lower} satisfies ${c.right}"
         case c: ConformanceCondition.FromNull =>
           s"${c.left} is ${if (c.anyRef) "" else "not "}conforms to AnyRef"
+        case c: ConformanceCondition.Undefined =>
+          s"${c.left} >: ${c.right} [restriction]"
         case _ =>
       }
       val msg = condition.v.msg

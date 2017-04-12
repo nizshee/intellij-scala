@@ -3,7 +3,7 @@ package org.jetbrains.plugins.scala.actions
 import org.jetbrains.plugins.scala.lang.psi.api.statements.params.ScTypeParam
 import org.jetbrains.plugins.scala.lang.psi.types.api.designator.ScProjectionType
 import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScParameterizedType, ScType}
-import org.jetbrains.plugins.scala.lang.psi.types.api.{ParameterizedType, StdType, TypeParameterType}
+import org.jetbrains.plugins.scala.lang.psi.types.api.{ParameterizedType, StdType, TypeParameterType, UndefinedType}
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.ScMethodType
 
 
@@ -75,6 +75,10 @@ object ConformanceCondition {
   case class Method(left: ScMethodType, right: ScMethodType, sameLen: Boolean, ret: Option[Relation.Conformance],
                     args: Seq[Invariant]) extends ConformanceCondition {
     override def satisfy: Boolean = sameLen && ret.exists(_.satisfy) && args.forall(_.satisfy)
+  }
+
+  case class Undefined(left: ScType, right: UndefinedType, cond: ScType) extends ConformanceCondition {
+    override def satisfy: Boolean = true
   }
 
 }

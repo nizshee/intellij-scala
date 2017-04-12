@@ -197,6 +197,7 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
       }
       handler.foreach { h =>
         h.log(s"find solution fore type variable $name")
+        h + h.Restriction(name._1)
       }
       tvMap.get(name) match {
         case Some(tp) => Some(tp)

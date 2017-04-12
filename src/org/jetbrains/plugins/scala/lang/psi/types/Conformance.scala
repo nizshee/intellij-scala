@@ -295,6 +295,7 @@ object Conformance extends api.Conformance {
       override def visitUndefinedType(u: UndefinedType) {
         handler.foreach { h =>
           h.rvisit("UndefinedSubstVisitor - skip for now")
+          h + ConformanceCondition.Undefined(l, u, l) // TODO? add subst
         }
         result = (true, undefinedSubst.addUpper(u.parameterType.nameAndId, l))
       }

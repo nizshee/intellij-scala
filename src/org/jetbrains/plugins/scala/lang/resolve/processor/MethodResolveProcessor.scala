@@ -139,35 +139,25 @@ class MethodResolveProcessor(override val ref: PsiElement,
   override def candidatesS: Set[ScalaResolveResult] = {
 
     if (isDynamic) {
-      handler.foreach { h =>
-        h.log("is dynamic - skip")
-      }
+      handler.foreach(_.log("is dynamic - skip"))
       collectCandidates(super.candidatesS.map(_.copy(isDynamic = true))).filter(_.isApplicable())
     } else {
-      handler.foreach { h =>
-        h.log(s"not dynamic -- super.candidates contains ${super.candidatesS}; instrument collectCandidates")
-      }
+      handler.foreach(_.log(s"not dynamic -- super.candidates contains ${super.candidatesS}; instrument collectCandidates"))
       collectCandidates(super.candidatesS)
     }
   }
 
   private def collectCandidates(input: Set[ScalaResolveResult]): Set[ScalaResolveResult] = {
     if (input.isEmpty) {
-      handler.foreach { h =>
-        h.log("no candidates found")
-      }
+      handler.foreach(_.log("no candidates found"))
       return input
     }
     if (!isShapeResolve && enableTupling && argumentClauses.nonEmpty) {
       isShapeResolve = true
       val cand1 = MethodResolveProcessor.candidates(this, input)
-      handler.foreach { h =>
-        h.log(s"candidates afrer shape resolve $cand1")
-      }
+      handler.foreach(_.log(s"candidates afrer shape resolve $cand1"))
       if (!isDynamic && (cand1.isEmpty || cand1.forall(_.tuplingUsed))) {
-        handler.foreach { h =>
-          h.log("shape resolve gives nothing && tupling case - skip")
-        }
+        handler.foreach(_.log("shape resolve gives nothing && tupling case - skip"))
         //tupling ok
         isShapeResolve = false
         val oldArg = argumentClauses
@@ -184,9 +174,7 @@ class MethodResolveProcessor(override val ref: PsiElement,
         res.map(r => r.copy(tuplingUsed = true))
       } else {
         isShapeResolve = false
-        handler.foreach { h =>
-          h.log("normal resolve")
-        }
+        handler.foreach(_.log("normal resolve"))
         MethodResolveProcessor.candidates(this, input)
       }
     } else
@@ -421,7 +409,7 @@ object MethodResolveProcessor {
           val cHandler = handler.map(_.compatibility)
           val result =
             Compatibility.compatible(tp.asInstanceOf[PsiNamedElement], substitutor, args, checkWithImplicits,
-              ref.getResolveScope, isShapeResolve, ref, handler = cHandler)
+              ref.getResolveScope, isShapeResolve, ref, handler = cHandler) // TODO? where we check substitutor has solutions?
           handler.foreach(_ + cHandler.get.args)
           problems ++= result.problems
           addExpectedTypeProblems()

@@ -7,6 +7,7 @@ import javax.swing.tree.{DefaultMutableTreeNode, DefaultTreeModel}
 import com.intellij.ide.util.treeView.{AbstractTreeBuilder, AbstractTreeStructure}
 import com.intellij.openapi.actionSystem.{AnAction, AnActionEvent, CommonDataKeys}
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.{JBPopup, JBPopupFactory}
 import com.intellij.openapi.util.Disposer
 import com.intellij.psi.search.GlobalSearchScope
@@ -49,6 +50,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     jTree.setRootVisible(false)
 
     val minSize = jTree.getPreferredSize
+    val size = jTree.getMaximumSize
 
     val scrollPane = ScrollPaneFactory.createScrollPane(jTree, true)
 
@@ -60,7 +62,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
       setRequestFocus(true).
       setResizable(true).
       setTitle("Debug Conformance:").
-      setMinSize(new Dimension(minSize.width + 500, minSize.height)).
+      setMinSize(new Dimension(size.width + 500, size.height)).
       createPopup
 
     Disposer.register(popup, builder)
@@ -140,12 +142,13 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
   }
 
   private def processReferenceExpression(reference: ScReferenceExpression)(implicit editor: Editor) = {
+    implicit val project: Project = editor.getProject
     val handler = new DCHandler.Resolver("", true)
     ReferenceExpressionResolver.resolve(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
 
     val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2)) // TODO receives already shaped alternatives - magic
     println(values)
-    showPopup(new DCTreeStructureResolver(editor.getProject, values))
+    showPopup(new DCTreeStructureResolver(values))
   }
 
   // TODO check how works with implicits
@@ -174,6 +177,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
   private def processScExpr(e: ScExpression)(implicit editor: Editor): Unit = {
     implicit val typeSystem: TypeSystem = e.typeSystem
+    implicit val project: Project = editor.getProject
     val handler = new DCHandler.Conformance("", true)
 
     val leftOption = e.expectedType()
@@ -188,7 +192,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
             val (canConform, subst) = Conformance.conformsInner(left, right, handler = Some(inner))
             val conformance = Relation.Conformance(left, right, inner.conditions)
             val values = Seq(DCTreeStructureConformance.Value(if (true) DebugConformanceAdapter(conformance) else conformance))
-            showPopup(new DCTreeStructureConformance(editor.getProject, values))
+            showPopup(new DCTreeStructureConformance(values))
             println(inner.conditions)
             if (canConform) {
               handler.logn("can conform")

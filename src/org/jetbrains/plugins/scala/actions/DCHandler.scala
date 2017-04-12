@@ -36,25 +36,22 @@ object DCHandler {
 
     def relations: Seq[ConformanceCondition.Variance] = _variances
 
-    def logt(left: ScType, right: ScType): Unit = if (debug) {
-      println(delimeter + s"left: ${left.presentableText}")
-      println(delimeter + s"right: ${right.presentableText}")
+    def logt(left: ScType, right: ScType): Unit = {
+      log(s"left: ${left.presentableText}")
+      log(s"right: ${right.presentableText}")
     }
 
-    def logtn(left: ScType, right: ScType): Unit = if (debug) {
-      println(delimeter + s"left: ${left.presentableText}")
-      println(delimeter + s"right: ${right.presentableText}")
-      println(delimeter)
+    def logtn(left: ScType, right: ScType): Unit = {
+      log(s"left: ${left.presentableText}")
+      logn(s"right: ${right.presentableText}")
     }
 
-    def visit(any: Any): Unit = if (debug) {
-      println(delimeter + "visit " + any)
-      println(delimeter)
+    def visit(any: Any): Unit = {
+      logn("visit " + any)
     }
 
-    def rvisit(any: Any): Unit = if (debug) {
-      println(delimeter + "right visit " + any)
-      println(delimeter)
+    def rvisit(any: Any): Unit = {
+      logn("right visit " + any)
     }
 
 
@@ -72,23 +69,41 @@ object DCHandler {
     }
 
     private var _args: Seq[Arg] = Seq()
+    private var _substitutor: Option[ScUndefinedSubstitutor] = None
 
     def +(arg: Arg): Arg = {
       _args :+= arg
       arg
     }
 
+    def +(subst: ScUndefinedSubstitutor): ScUndefinedSubstitutor = {
+      _substitutor = Some(subst)
+      subst
+    }
+
+    def subst: Option[ScUndefinedSubstitutor] = _substitutor
+
     def handler: DCHandler.Conformance = new DCHandler.Conformance(delimeter + "r|", debug)
 
     def args: Seq[Arg] = _args
 
     def logCase(any: Any): Unit = {
-      println(delimeter + "case - " + any)
-      println(delimeter)
+      logn("case - " + any)
     }
   }
 
-  class Substitutor(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug)
+  class Substitutor(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug) {
+    case class Restriction(name: String)
+
+    private var _restrictions: Seq[Restriction] = Seq.empty
+
+    def +(restriction: Restriction): Restriction = {
+      _restrictions :+= restriction
+      restriction
+    }
+
+    def restictions: Seq[Restriction] = _restrictions
+  }
 
   class Resolver(delimter: String, debug: Boolean) extends DCHandler(delimter, debug) {
     case class Weight(v: Int, opposite: Int)
@@ -97,7 +112,7 @@ object DCHandler {
     private var _candidates: Map[PsiNamedElement, Candidate] = Map.empty
 
     def +(el: PsiNamedElement): Candidate = {
-      val candidate = Candidate(None, Map.empty, Seq())
+      val candidate = Candidate(None, Map.empty, Seq.empty)
       last = Some(el)
       _candidates += el -> candidate
       candidate
