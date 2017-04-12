@@ -356,11 +356,10 @@ object Conformance extends api.Conformance {
     private def checkEquiv() {
       val isEquiv = l.equiv(r, undefinedSubst)
       if (isEquiv._1) {
-        handler.foreach { h =>
-          h + ConformanceCondition.Equivalent(Relation.Equivalence(l, r, satisfy = true))
-        }
+        handler.foreach(_ + ConformanceCondition.Equivalent(Relation.Equivalence(l, r, satisfy = true)))
         result = isEquiv
       }
+      else handler.foreach(_ + ConformanceCondition.Equivalent(Relation.Equivalence(l, r, satisfy = false)))
     }
 
     trait ExistentialSimplification extends ScalaTypeVisitor { // TODO ???? simplifies existential
@@ -805,6 +804,7 @@ object Conformance extends api.Conformance {
       if (result != null) return
 
       if (checkWeak && r.isInstanceOf[ValType]) {
+        handler.foreach(_.log("visitStdType checkWeak - skip"))
         (r, x) match {
           case (Byte, Short | Int | Long | Float | Double) =>
             result = (true, undefinedSubst)

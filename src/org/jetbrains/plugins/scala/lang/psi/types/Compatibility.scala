@@ -232,9 +232,10 @@ object Compatibility {
             else {
               handler.foreach { h =>
                 h.log(s"find constaints to $exprType >: $paramType")
+                val cHandler = h.handler
                 val (_, subst) = typeSystem.conformance.conformsInner(exprType, paramType,
-                  substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = Some(h.handler))
-                h + (param.name, exprType, paramType, subst)
+                  substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = Some(cHandler))
+                h + h.Arg(param.name, exprType, paramType, subst, cHandler.conditions)
               }
               undefSubst += exprType.conforms(paramType, ScUndefinedSubstitutor(), checkWeak = true)._2 // TODO? we really try to conform expected type to exprType?
               List.empty
@@ -414,9 +415,7 @@ object Compatibility {
     val exprs: Seq[Expression] = argClauses.headOption match {case Some(seq) => seq case _ => Seq.empty}
     named match {
       case synthetic: ScSyntheticFunction =>
-        handler.foreach { h =>
-          h.logCase("ScSyntheticFunction")
-        }
+        handler.foreach(_.logCase("ScSyntheticFunction"))
         if (synthetic.paramClauses.isEmpty)
           return ConformanceExtResult(Seq(new DoesNotTakeParameters))
 
@@ -424,20 +423,14 @@ object Compatibility {
           p.copy(paramType = substitutor.subst(p.paramType))
         }, exprs = exprs, checkWithImplicits = checkWithImplicits, isShapesResolve = isShapesResolve, handler = handler)
       case fun: ScFunction =>
-        handler.foreach { h =>
-          h.logCase("ScFunction")
-        }
+        handler.foreach(_.logCase("ScFunction"))
         if(!fun.hasParameterClause && argClauses.nonEmpty) {
-          handler.foreach { h =>
-            h.logn("strange condition with parameters and args failed; interrupt")
-          }
+          handler.foreach(_.logn("strange condition with parameters and args failed; interrupt"))
           return ConformanceExtResult(Seq(new DoesNotTakeParameters))
         }
 
         if (QuasiquoteInferUtil.isMetaQQ(fun) && ref.isInstanceOf[ScReferenceExpression]) {
-          handler.foreach { h =>
-            h.logn("some metaprogramming")
-          }
+          handler.foreach(_.logn("some metaprogramming"))
           val params = QuasiquoteInferUtil.getMetaQQExpectedTypes(ref.asInstanceOf[ScReferenceExpression])
           return checkConformanceExt(checkNames = false, params, exprs, checkWithImplicits, isShapesResolve, handler = handler)
         }

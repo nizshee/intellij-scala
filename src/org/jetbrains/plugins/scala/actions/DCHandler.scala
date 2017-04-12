@@ -7,11 +7,20 @@ import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
 /**
   * Created by user on 4/10/17.
   */
-object DCHandler {
-  class Conformance(debug: Boolean, nesting: Int = 0) {
+class DCHandler(delimeter: String, debug: Boolean) {
+  def log(any: Any): Unit = if (debug) println(delimeter + any)
+  def logn(any: Any): Unit = if (debug) {
+    println(delimeter + any)
+    println()
+  }
+}
 
-    private val offset = nesting * 1
-    private val delimeter = if (offset < 1) "" else "|" * (offset - 1) + "|"
+object DCHandler {
+
+  class Conformance(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug) {
+
+//    private val offset = nesting * 1
+//    private val delimeter = if (offset < 1) "" else "|" * (offset - 1) + "|"
 
     private var _conditions: Seq[ConformanceCondition] = Seq()
     private var _variances: Seq[ConformanceCondition.Variance] = Seq()
@@ -26,13 +35,6 @@ object DCHandler {
     def conditions: Seq[ConformanceCondition] = _conditions
 
     def relations: Seq[ConformanceCondition.Variance] = _variances
-
-    def log(any: Any): Unit = if (debug) println(delimeter + any)
-
-    def logn(any: Any): Unit = if (debug) {
-      println(delimeter + any)
-      println(delimeter)
-    }
 
     def logt(left: ScType, right: ScType): Unit = if (debug) {
       println(delimeter + s"left: ${left.presentableText}")
@@ -56,73 +58,83 @@ object DCHandler {
     }
 
 
-    def inner: Conformance =  new Conformance(debug, nesting + 1)
+    def inner: Conformance =  new Conformance(delimeter + "|", debug)
   }
 
 
-  class Compatibility {
-    case class Arg(name: String, expectedType: ScType, actualType: ScType, undefinedSubstitutor: ScUndefinedSubstitutor)
+  class Compatibility(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug) {
+    case class Arg(name: String,
+                   expectedType: ScType,
+                   actualType: ScType,
+                   undefinedSubstitutor: ScUndefinedSubstitutor,
+                   conditions: Seq[ConformanceCondition]) {
+      def satisfy: Boolean = conditions.exists(_.satisfy)
+    }
 
     private var _args: Seq[Arg] = Seq()
 
-    def +(name: String, expected: ScType, actual: ScType, undefinedSubstitutor: ScUndefinedSubstitutor): Arg = {
-      val arg = Arg(name, expected, actual, undefinedSubstitutor)
+    def +(arg: Arg): Arg = {
       _args :+= arg
       arg
     }
 
-    def handler: DCHandler.Conformance = new DCHandler.Conformance(false)
+    def handler: DCHandler.Conformance = new DCHandler.Conformance(delimeter + "r|", debug)
 
     def args: Seq[Arg] = _args
 
-    def log(any: Any): Unit = println(any)
-    def logn(any: Any): Unit = {
-      println(any)
-      println()
-    }
-
     def logCase(any: Any): Unit = {
-      println("case - " + any)
-      println()
+      println(delimeter + "case - " + any)
+      println(delimeter)
     }
   }
 
-  class Substitutor {
-    def log(any: Any): Unit = println(any)
-    def logn(any: Any): Unit = {
-      println(any)
-      println()
-    }
-  }
+  class Substitutor(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug)
 
-  class Resolver {
-    case class Candidate(rr: Option[ScalaResolveResult])
-    private var candidatesList: List[(PsiNamedElement, Candidate)] = List.empty
+  class Resolver(delimter: String, debug: Boolean) extends DCHandler(delimter, debug) {
+    case class Weight(v: Int, opposite: Int)
+    case class Candidate(rr: Option[ScalaResolveResult], weights: Map[PsiNamedElement, Weight], args: Seq[DCHandler.Compatibility#Arg])
+    private var last: Option[PsiNamedElement] = None
+    private var _candidates: Map[PsiNamedElement, Candidate] = Map.empty
 
     def +(el: PsiNamedElement): Candidate = {
-      val candidate = Candidate(None)
-      candidatesList ::= (el -> candidate)
+      val candidate = Candidate(None, Map.empty, Seq())
+      last = Some(el)
+      _candidates += el -> candidate
       candidate
     }
 
-    def +(rr: ScalaResolveResult) = {
-      candidatesList match {
-        case (el, candidate) :: tail =>
-          candidatesList = el -> candidate.copy(rr = Some(rr)) :: tail
+    def +(rr: ScalaResolveResult): Unit = {
+      last.flatMap(el => _candidates.get(el).map(el -> _)) match {
+        case Some((el, candidate)) =>
+          _candidates += el -> candidate.copy(rr = Some(rr))
+        case _ =>
+      }
+    }
+
+    def +(args: Seq[DCHandler.Compatibility#Arg]): Unit = {
+      last.flatMap(el => _candidates.get(el).map(el -> _)) match {
+        case Some((el, candidate)) =>
+          _candidates += el -> candidate.copy(args = args)
+        case None =>
+      }
+    }
+
+    def addWeight(left: PsiNamedElement, right: PsiNamedElement, weight: Weight): Unit = {
+      _candidates.get(left) match {
+        case Some(candidate) =>
+          _candidates += left -> candidate.copy(
+            weights = candidate.weights.updated(right, weight)
+          )
         case _ =>
       }
     }
 
     def clear(): Unit = {
-      candidatesList = List.empty
+      _candidates = Map.empty
     }
 
-    def candidates: List[(PsiNamedElement, Candidate)] = candidatesList
+    def compatibility: Compatibility = new Compatibility(delimter + "c|", debug)
 
-    def log(any: Any): Unit = println(any)
-    def logn(any: Any): Unit = {
-      println(any)
-      println()
-    }
+    def candidates: List[(PsiNamedElement, Candidate)] = _candidates.toList
   }
 }

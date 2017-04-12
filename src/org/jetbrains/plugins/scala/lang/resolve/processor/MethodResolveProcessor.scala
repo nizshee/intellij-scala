@@ -4,6 +4,7 @@ package resolve
 package processor
 
 import com.intellij.psi._
+import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.caches.CachesUtil._
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api.InferUtil
@@ -203,7 +204,8 @@ object MethodResolveProcessor {
                           prevTypeInfo: Seq[TypeParameter],
                           expectedOption: () => Option[ScType],
                           isUnderscore: Boolean,
-                          isShapeResolve: Boolean)(implicit typeSystem: TypeSystem): ConformanceExtResult = {
+                          isShapeResolve: Boolean,
+                          handler: Option[DCHandler.Resolver])(implicit typeSystem: TypeSystem): ConformanceExtResult = {
     val problems = new ArrayBuffer[ApplicabilityProblem]()
 
     val realResolveResult = c.innerResolveResult match {
@@ -236,6 +238,7 @@ object MethodResolveProcessor {
       case _ => Seq.empty
     })
 
+
     def addExpectedTypeProblems(eOption: Option[ScType] = expectedOption()): Unit = {
       if (eOption.isEmpty) return
 
@@ -245,12 +248,7 @@ object MethodResolveProcessor {
           !f.paramClauses.clauses.apply(1).isImplicit =>
           problems += ExpectedTypeMismatch //do not check expected types for more than one param clauses
           Nothing
-        case f: ScFunction =>
-          val ti = tempSubstitutor
-          val s = realResolveResult.substitutor
-          val t = f.returnType
-          val st = substitutor.subst(t.getOrNothing)
-          substitutor.subst(f.returnType.getOrNothing) // TODO break point here
+        case f: ScFunction => substitutor.subst(f.returnType.getOrNothing)
         case f: ScFun => substitutor.subst(f.retType)
         case m: PsiMethod =>
           Option(m.getReturnType).map { rt =>
@@ -284,9 +282,12 @@ object MethodResolveProcessor {
       }
 
       def processFunctionType(retType: ScType, params: Seq[ScType]): ConformanceExtResult = {
+        handler.foreach(_.log("processFunctionType"))
         val args = params.map(new Expression(_))
+        val cHandler = handler.map(_.compatibility)
         val result = Compatibility.compatible(fun, substitutor, List(args), checkWithImplicits = false,
-        scope = ref.getResolveScope, isShapesResolve = isShapeResolve)
+        scope = ref.getResolveScope, isShapesResolve = isShapeResolve, handler = cHandler)
+        handler.foreach(_ + cHandler.get.args)
         problems ++= result.problems
         addExpectedTypeProblems(Some(retType))
         result.copy(problems)
@@ -317,6 +318,7 @@ object MethodResolveProcessor {
     }
 
     def constructorCompatibility(constr: ScMethodLike with PsiNamedElement): ConformanceExtResult = {
+      handler.foreach(_.log("constructorCompatibility - skip"))
       val classTypeParameters: Seq[ScTypeParam] = constr.getClassTypeParameters.map(_.typeParameters).getOrElse(Seq())
       if (typeArgElements.isEmpty || typeArgElements.length == classTypeParameters.length) {
         val result =
@@ -331,6 +333,7 @@ object MethodResolveProcessor {
     }
 
     def javaConstructorCompatibility(constr: PsiMethod): ConformanceExtResult = {
+      handler.foreach(_.log("javaConstructorCompatibility - skip"))
       val classTypeParmeters = constr.containingClass.getTypeParameters
       if (typeArgElements.isEmpty || typeArgElements.length == classTypeParmeters.length) {
         val result =
@@ -415,14 +418,17 @@ object MethodResolveProcessor {
           addExpectedTypeProblems()
           ConformanceExtResult(problems)
         } else {
+          val cHandler = handler.map(_.compatibility)
           val result =
             Compatibility.compatible(tp.asInstanceOf[PsiNamedElement], substitutor, args, checkWithImplicits,
-              ref.getResolveScope, isShapeResolve, ref)
+              ref.getResolveScope, isShapeResolve, ref, handler = cHandler)
+          handler.foreach(_ + cHandler.get.args)
           problems ++= result.problems
           addExpectedTypeProblems()
           result.copy(problems)
         }
       case tp: PsiTypeParameterListOwner with PsiNamedElement =>
+        handler.foreach(_.log("PsiTypeParameterListOwner - skip"))
         val typeArgCount = typeArgElements.length
         val typeParamCount = tp.getTypeParameters.length
         if (typeArgCount > 0 && typeArgCount != typeParamCount) {
@@ -602,11 +608,11 @@ object MethodResolveProcessor {
       //problemsFor make all the work, wrapping it in scala collection API adds 9 unnecessary methods to the stacktrace
       while (expanded.hasNext) {
         val (r, cleanTypeArguments) = expanded.next()
-        handler.foreach(_.log(r.element.getNode.getText))
+        handler.foreach(_ + r.element)
         handler.foreach(_ + r.element)
         val typeArgElems = if (cleanTypeArguments) Seq.empty else typeArgElements
         val pr = problemsFor(r, applicationImplicits, ref, argumentClauses, typeArgElems, selfConstructorResolve,
-          prevTypeInfo, expectedOption, isUnderscore, isShapeResolve)
+          prevTypeInfo, expectedOption, isUnderscore, isShapeResolve, handler = handler)
 
         val result = r.innerResolveResult match {
           case Some(rr) if argumentClauses.nonEmpty =>
@@ -718,7 +724,7 @@ object MethodResolveProcessor {
       val len = if (argumentClauses.isEmpty) 0 else argumentClauses.head.length
       handler.foreach(_.log(s"filtered before MostSpecificUtil $filtered"))
       if (filtered.size == 1) return filtered
-      MostSpecificUtil(ref, len).mostSpecificForResolveResult(filtered, hasTypeParametersCall = typeArgElements.nonEmpty) match {
+      MostSpecificUtil(ref, len, handler = handler).mostSpecificForResolveResult(filtered, hasTypeParametersCall = typeArgElements.nonEmpty) match {
         case Some(r) => Set(r)
         case None => filtered
       }

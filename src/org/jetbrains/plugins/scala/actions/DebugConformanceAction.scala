@@ -140,16 +140,17 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
   }
 
   private def processReferenceExpression(reference: ScReferenceExpression)(implicit editor: Editor) = {
-    val handler = new DCHandler.Resolver
+    val handler = new DCHandler.Resolver("", true)
     ReferenceExpressionResolver.resolve(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
 
-    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2)) // TODO receives already shaped alternatives - magick
+    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2)) // TODO receives already shaped alternatives - magic
+    println(values)
     showPopup(new DCTreeStructureResolver(editor.getProject, values))
   }
 
   // TODO check how works with implicits
   private def processScResolveRes(args: Seq[ScExpression], rr: ScalaResolveResult, scope: GlobalSearchScope) = {
-    val handler = new DCHandler.Compatibility
+    val handler = new DCHandler.Compatibility("", true)
 
     val argExprs = args.map(Compatibility.Expression.apply) // TODO how to handle many parrents?
     val element = rr.getActualElement
@@ -158,7 +159,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     println(s"begining subs is $subs")
     val c = Compatibility.compatible(element, subs, List(argExprs), false, scope, false, handler = Some(handler))
     println(handler.args)
-    val sHandler = new DCHandler.Substitutor
+    val sHandler = new DCHandler.Substitutor("", true)
     c.undefSubst.getSubstitutorWithBounds(notNonable = true, handler = Some(sHandler)) match {
       case Some((substitutor, _, _)) =>
         println(substitutor)
@@ -173,7 +174,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
   private def processScExpr(e: ScExpression)(implicit editor: Editor): Unit = {
     implicit val typeSystem: TypeSystem = e.typeSystem
-    val handler = new DCHandler.Conformance(true)
+    val handler = new DCHandler.Conformance("", true)
 
     val leftOption = e.expectedType()
     val rightTypeResult = e.getNonValueType().map(_.inferValueType)

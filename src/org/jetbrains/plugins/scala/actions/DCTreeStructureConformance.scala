@@ -4,6 +4,7 @@ import java.util
 
 import com.intellij.ide.projectView.PresentationData
 import com.intellij.ide.util.treeView.{AbstractTreeNode, AbstractTreeStructure, NodeDescriptor}
+import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
 
 
@@ -71,11 +72,13 @@ object DCTreeStructureConformance {
       relation.v match {
         case r: Relation.Equivalence =>
           presentationData.setPresentableText((if (relation.prefix.nonEmpty) relation.prefix + ": " else "") +
-            s"${r.left} =: ${r.right} (${r.satisfy})")
+            s"${r.left} =: ${r.right}")
         case r: Relation.Conformance =>
           presentationData.setPresentableText((if (relation.prefix.nonEmpty) relation.prefix + ": " else "") +
-            s"${r.left} >: ${r.right} (${r.satisfy})")
+            s"${r.left} >: ${r.right}")
       }
+      if (!relation.v.satisfy)
+        presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
 
   }
@@ -140,7 +143,9 @@ object DCTreeStructureConformance {
         case _ =>
       }
       val msg = condition.v.msg
-      presentationData.setPresentableText(s"$data (${condition.v.satisfy})" + (if (msg.nonEmpty) "//" else "") + msg)
+      presentationData.setPresentableText(s"$data" + (if (msg.nonEmpty) "//" else "") + msg)
+      if (!condition.v.satisfy)
+        presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
   }
 

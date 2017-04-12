@@ -6,6 +6,7 @@ package processor
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi._
 import com.intellij.psi.util.PsiTreeUtil
+import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.ScalaPsiUtil
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
@@ -30,7 +31,7 @@ import scala.collection.mutable.ArrayBuffer
  * User: Alexander Podkhalyuzin
  * Date: 26.04.2010
  */
-case class MostSpecificUtil(elem: PsiElement, length: Int)
+case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHandler.Resolver] = None)
                            (implicit typeSystem: TypeSystem) {
   def mostSpecificForResolveResult(applicable: Set[ScalaResolveResult],
                                    hasTypeParametersCall: Boolean = false,
@@ -278,12 +279,21 @@ case class MostSpecificUtil(elem: PsiElement, length: Int)
   private def isMoreSpecific[T](r1: InnerScalaResolveResult[T], r2: InnerScalaResolveResult[T], checkImplicits: Boolean): Boolean = {
     ProgressManager.checkCanceled()
     (r1.implicitConversionClass, r2.implicitConversionClass) match {
-      case (Some(t1), Some(t2)) => if (ScalaPsiUtil.isInheritorDeep(t1, t2)) return true
+      case (Some(t1), Some(t2)) =>
+        handler.foreach(_.log("implicitConersionClass - skip"))
+        if (ScalaPsiUtil.isInheritorDeep(t1, t2)) return true
       case _ =>
     }
-    if (r1.callByNameImplicit ^ r2.callByNameImplicit) return !r1.callByNameImplicit
+    if (r1.callByNameImplicit ^ r2.callByNameImplicit) {
+      handler.foreach(_.log("callByNameImplicit - skip"))
+      return !r1.callByNameImplicit
+    }
     val weightR1R2 = relativeWeight(r1, r2, checkImplicits)
     val weightR2R1 = relativeWeight(r2, r1, checkImplicits)
+    handler.foreach { h =>
+      h.addWeight(r1.element, r2.element, h.Weight(weightR1R2, weightR2R1))
+      h.addWeight(r2.element, r1.element, h.Weight(weightR2R1, weightR1R2))
+    }
     weightR1R2 > weightR2R1
   }
 
