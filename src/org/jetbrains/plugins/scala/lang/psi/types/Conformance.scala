@@ -294,8 +294,9 @@ object Conformance extends api.Conformance {
     trait UndefinedSubstVisitor extends ScalaTypeVisitor {
       override def visitUndefinedType(u: UndefinedType) {
         handler.foreach { h =>
-          h.rvisit("UndefinedSubstVisitor - skip for now")
-          h + ConformanceCondition.Undefined(l, u, l) // TODO? add subst
+          h.rvisit("UndefinedSubstVisitor - ok")
+          h + ConformanceCondition.Undefined(l, u, l) // TODO? add subst; where upper, lower?
+          h + u
         }
         result = (true, undefinedSubst.addUpper(u.parameterType.nameAndId, l))
       }

@@ -1,6 +1,7 @@
 package org.jetbrains.plugins.scala.actions
 
 import com.intellij.psi.PsiNamedElement
+import org.jetbrains.plugins.scala.lang.psi.types.api.{Any, Nothing, UndefinedType}
 import org.jetbrains.plugins.scala.lang.psi.types.{ScType, ScUndefinedSubstitutor}
 import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
 
@@ -21,6 +22,15 @@ object DCHandler {
 
 //    private val offset = nesting * 1
 //    private val delimeter = if (offset < 1) "" else "|" * (offset - 1) + "|"
+
+    private var _undefinedTypes: Map[(String, Long), UndefinedType] = Map.empty
+
+    def +(undefinedType: UndefinedType): UndefinedType = {
+      _undefinedTypes += undefinedType.parameterType.nameAndId -> undefinedType
+      undefinedType
+    }
+
+    def undefinedTypes: Map[(String, Long), UndefinedType] = _undefinedTypes
 
     private var _conditions: Seq[ConformanceCondition] = Seq()
     private var _variances: Seq[ConformanceCondition.Variance] = Seq()
@@ -64,24 +74,17 @@ object DCHandler {
                    expectedType: ScType,
                    actualType: ScType,
                    undefinedSubstitutor: ScUndefinedSubstitutor,
-                   conditions: Seq[ConformanceCondition]) {
+                   conditions: Seq[ConformanceCondition],
+                   /*remove*/ undefinedTypes: Map[(String, Long), UndefinedType]) {
       def satisfy: Boolean = conditions.exists(_.satisfy)
     }
 
     private var _args: Seq[Arg] = Seq()
-    private var _substitutor: Option[ScUndefinedSubstitutor] = None
 
     def +(arg: Arg): Arg = {
       _args :+= arg
       arg
     }
-
-    def +(subst: ScUndefinedSubstitutor): ScUndefinedSubstitutor = {
-      _substitutor = Some(subst)
-      subst
-    }
-
-    def subst: Option[ScUndefinedSubstitutor] = _substitutor
 
     def handler: DCHandler.Conformance = new DCHandler.Conformance(delimeter + "r|", debug)
 
@@ -93,7 +96,10 @@ object DCHandler {
   }
 
   class Substitutor(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug) {
-    case class Restriction(name: String)
+    case class Restriction(name: (String, Long),
+                           `type`: Option[ScType],
+                           uppers: Set[ScType],
+                           lowers: Set[ScType])
 
     private var _restrictions: Seq[Restriction] = Seq.empty
 
@@ -102,17 +108,50 @@ object DCHandler {
       restriction
     }
 
+    def +(name: (String, Long)): Restriction = {
+      val restriction = Restriction(name, None, Set.empty, Set.empty)
+      _restrictions :+= restriction
+      restriction
+    }
+
+    def addLowers(lowers: Set[ScType]): Unit = {
+      _restrictions.headOption match {
+        case Some(restriction) =>
+          _restrictions = restriction.copy(lowers = lowers) +: _restrictions.tail
+        case _ =>
+      }
+    }
+
+    def addUppers(uppers: Set[ScType]): Unit = {
+      _restrictions.headOption match {
+        case Some(restriction) =>
+          _restrictions = restriction.copy(uppers = uppers) +: _restrictions.tail
+        case _ =>
+      }
+    }
+
+    def addType(`type`: ScType): Unit = {
+      _restrictions.headOption match {
+        case Some(restriction) =>
+          _restrictions = restriction.copy(`type` = Some(`type`)) +: _restrictions.tail
+        case _ =>
+      }
+    }
+
     def restictions: Seq[Restriction] = _restrictions
   }
 
   class Resolver(delimter: String, debug: Boolean) extends DCHandler(delimter, debug) {
     case class Weight(v: Int, opposite: Int)
-    case class Candidate(rr: Option[ScalaResolveResult], weights: Map[PsiNamedElement, Weight], args: Seq[DCHandler.Compatibility#Arg])
+    case class Candidate(rr: Option[ScalaResolveResult],
+                         weights: Map[PsiNamedElement, Weight],
+                         args: Seq[DCHandler.Compatibility#Arg],
+                         restrictions: Seq[DCHandler.Substitutor#Restriction])
     private var last: Option[PsiNamedElement] = None
     private var _candidates: Map[PsiNamedElement, Candidate] = Map.empty
 
     def +(el: PsiNamedElement): Candidate = {
-      val candidate = Candidate(None, Map.empty, Seq.empty)
+      val candidate = Candidate(None, Map.empty, Seq.empty, Seq.empty)
       last = Some(el)
       _candidates += el -> candidate
       candidate
@@ -123,6 +162,14 @@ object DCHandler {
         case Some((el, candidate)) =>
           _candidates += el -> candidate.copy(rr = Some(rr))
         case _ =>
+      }
+    }
+
+    def addRestrictions(restrictions: Seq[Substitutor#Restriction]): Unit = {
+      last.flatMap(el => _candidates.get(el).map(el -> _)) match {
+        case Some((el, candidate)) =>
+          _candidates += el -> candidate.copy(restrictions = restrictions)
+        case None =>
       }
     }
 
@@ -149,6 +196,8 @@ object DCHandler {
     }
 
     def compatibility: Compatibility = new Compatibility(delimter + "c|", debug)
+
+    def substitutor: Substitutor = new Substitutor(delimter + "s|", debug)
 
     def candidates: List[(PsiNamedElement, Candidate)] = _candidates.toList
   }

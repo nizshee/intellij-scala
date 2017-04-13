@@ -9,7 +9,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiNamedElement
 import org.jetbrains.plugins.scala.actions.DCTreeStructureCompatibility.{CompatibilityNode, CompatibilityValue}
 import org.jetbrains.plugins.scala.actions.DCTreeStructureConformance.{ConditionNode, RelationNode}
-import org.jetbrains.plugins.scala.actions.DCTreeStructureSubstitutor.{RestrictionNode, SubstitutorNode}
+import org.jetbrains.plugins.scala.actions.DCTreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue, TypeVariableNode}
 
 /**
   * Created by user on 4/10/17.
@@ -57,7 +57,7 @@ class DCTreeStructureResolver(values: Seq[DCTreeStructureResolver.Value])(implic
     case n: SubstitutorNode =>
       val children = n.getChildren
       children.toArray(new Array[AnyRef](children.size))
-    case n: RestrictionNode =>
+    case n: TypeVariableNode =>
       val children = n.getChildren
       children.toArray(new Array[AnyRef](children.size))
     case _ => Array.empty
@@ -87,15 +87,17 @@ object DCTreeStructureResolver {
 //    }.toSeq
 
     private val greaterWeight = value.candidate.weights.values.forall(w => w.v > w.opposite)
+    private val restictionsHaveSolution = value.candidate.restrictions.forall(_.`type`.nonEmpty)
     private val conditionsExists = value.candidate.args.forall(_.conditions.exists(_.satisfy))
     private val weights = Some(value.candidate.weights).filter(_.nonEmpty).map(w => new WeightNode(WeightsValue(w)))
     private val compatibility = Some(value.candidate.args).filter(_.nonEmpty).map(a => new CompatibilityNode(CompatibilityValue(a)))
+    private val restrictions = Some(value.candidate.restrictions).filter(_.nonEmpty).map(r => new SubstitutorNode(SubstitutorValue(r)))
 
 
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
-//      problems.foreach(list.add)
       compatibility.foreach(list.add)
+      restrictions.foreach(list.add)
       weights.foreach(list.add)
       list
     }
@@ -103,7 +105,8 @@ object DCTreeStructureResolver {
     override def update(presentationData: PresentationData): Unit = {
       val text = el2String(value.el)
       presentationData.setPresentableText(text)
-      if (!greaterWeight || !conditionsExists) presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
+      if (!greaterWeight || !conditionsExists || !restictionsHaveSolution)
+        presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
   }
 

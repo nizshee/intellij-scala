@@ -446,9 +446,13 @@ object MethodResolveProcessor {
     }
 
     if (result.problems.forall(_ == ExpectedTypeMismatch)) {
+      handler.foreach(_.log("resolve substitutor!!!"))
+      val inner = handler.map(_.substitutor)
       var uSubst = result.undefSubst
-      uSubst.getSubstitutor(notNonable = false) match {
-        case None => result.copy(problems = Seq(WrongTypeParameterInferred))
+      uSubst.getSubstitutor(notNonable = false, handler = inner) match {
+        case None =>
+          handler.foreach(_.addRestrictions(inner.get.restictions))
+          result.copy(problems = Seq(WrongTypeParameterInferred))
         case Some(unSubst) =>
           def hasRecursiveTypeParameters(typez: ScType): Boolean = {
 
@@ -479,9 +483,15 @@ object MethodResolveProcessor {
               }
             }
           }
-          uSubst.getSubstitutor(notNonable = false) match {
-            case Some(_) => result
-            case _ => result.copy(problems = Seq(WrongTypeParameterInferred))
+          val inner = handler.map(_.substitutor)
+          uSubst.getSubstitutor(notNonable = false, handler = inner) match {
+            case Some(_) =>
+              handler.foreach(_.addRestrictions(inner.get.restictions))
+              result
+            case _ =>
+              handler.foreach(_.log("???" + inner.get.restictions))
+              handler.foreach(_.addRestrictions(inner.get.restictions))
+              result.copy(problems = Seq(WrongTypeParameterInferred))
           }
       }
     } else result

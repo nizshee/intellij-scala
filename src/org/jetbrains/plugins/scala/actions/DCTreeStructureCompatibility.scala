@@ -7,6 +7,7 @@ import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
 import org.jetbrains.plugins.scala.actions.DCTreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue}
+import org.jetbrains.plugins.scala.lang.psi.types.api.UndefinedType
 import org.jetbrains.plugins.scala.lang.psi.types.{ScUndefinedSubstitutor, ScalaTypeSystem}
 
 
@@ -23,17 +24,19 @@ object DCTreeStructureCompatibility {
       )
     )
 
-    private val subst = {
-      val undefinedSubst = value.arguments.foldLeft(ScUndefinedSubstitutor()(ScalaTypeSystem))(_ + _.undefinedSubstitutor) // TODO? actual system
-      val handler = new DCHandler.Substitutor("", false) // TODO? mv somwhere near other handlers
-      undefinedSubst.getSubstitutorWithBounds(notNonable = true, handler = Some(handler))
-      Some(handler.restictions).filter(_.nonEmpty).map(rs => new SubstitutorNode(SubstitutorValue(rs)))
-    }
+//    private val subst = {
+//      val undefinedSubst = value.arguments.foldLeft(ScUndefinedSubstitutor()(ScalaTypeSystem))(_ + _.undefinedSubstitutor) // TODO? actual system
+//      val handler = new DCHandler.Substitutor("", true) // TODO? mv somwhere near other handlers
+//      undefinedSubst.getSubstitutorWithBounds(notNonable = true, handler = Some(handler))
+//      val types: Map[(String, Long), UndefinedType] = value.arguments.map(_.undefinedTypes).fold(Map.empty)(_ ++ _)
+//      println(handler.restictions)
+//      Some(handler.restictions).filter(_.nonEmpty).map(rs => new SubstitutorNode(SubstitutorValue(rs)))
+//    }
 
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
       args.foreach(list.add)
-      subst.foreach(list.add)
+//      subst.foreach(list.add)
       list
     }
 

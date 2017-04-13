@@ -174,7 +174,6 @@ object Compatibility {
                           handler: Option[DCHandler.Compatibility]): ConformanceExtResult = {
     ProgressManager.checkCanceled()
     var undefSubst = ScUndefinedSubstitutor()
-    handler.foreach(_ + undefSubst)
 
     val clashedAssignments = clashedAssignmentsIn(exprs)
 
@@ -232,7 +231,7 @@ object Compatibility {
               val cHandler = h.handler
               val (_, subst) = typeSystem.conformance.conformsInner(exprType, paramType,
                 substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = Some(cHandler))
-              h + h.Arg(param.name, exprType, paramType, subst, cHandler.conditions)
+              h + h.Arg(param.name, exprType, paramType, subst, cHandler.conditions, cHandler.undefinedTypes)
             }
             val conforms = exprType.weakConforms(paramType) // TODO? calculates two times, i'll add third
             matched ::=(param, expr.expr)
