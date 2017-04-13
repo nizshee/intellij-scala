@@ -446,7 +446,6 @@ object MethodResolveProcessor {
     }
 
     if (result.problems.forall(_ == ExpectedTypeMismatch)) {
-      handler.foreach(_.log("resolve substitutor!!!"))
       val inner = handler.map(_.substitutor)
       var uSubst = result.undefSubst
       uSubst.getSubstitutor(notNonable = false, handler = inner) match {
@@ -720,7 +719,7 @@ object MethodResolveProcessor {
     else if (filtered.isEmpty) mapped
     else {
       val len = if (argumentClauses.isEmpty) 0 else argumentClauses.head.length
-      handler.foreach(_.log(s"filtered before MostSpecificUtil $filtered"))
+      handler.foreach(_.log(s"filtered before MostSpecificUtil ${filtered.map(_.element.getNode.getText)}"))
       if (filtered.size == 1) return filtered
       MostSpecificUtil(ref, len, handler = handler).mostSpecificForResolveResult(filtered, hasTypeParametersCall = typeArgElements.nonEmpty) match {
         case Some(r) => Set(r)

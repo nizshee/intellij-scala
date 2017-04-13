@@ -6,7 +6,7 @@ package processor
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi._
 import com.intellij.psi.util.PsiTreeUtil
-import org.jetbrains.plugins.scala.actions.DCHandler
+import org.jetbrains.plugins.scala.actions.{AsSpecificAsCondition, DCHandler}
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.ScalaPsiUtil
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
@@ -189,7 +189,9 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
             //todo this is possible, when one variant is empty with implicit parameters, and second without parameters.
             //in this case it's logical that method without parameters must win...
             case (Left(_), Right(_)) if !r1.implicitCase => return false
-            case _ => return true
+            case _ =>
+//              handler.foreach(_.addWeight(r1.element, r2.element, AsSpecificAsCondition.Other(t1, t2, satisfy = true)))
+              return true
           }
 
         var u = conformance._2
@@ -231,7 +233,9 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
             }
           case _ =>
         }
-        u.getSubstitutor.isDefined
+        val isDefined = u.getSubstitutor.isDefined
+        handler.foreach(_.addWeight(r1.element, r2.element, AsSpecificAsCondition.Method(t1, t2, satisfy = true)))
+        isDefined
       case (_, _: PsiMethod) => true
       case (e1, e2) =>
         val t1: ScType = getType(e1, r1.implicitCase)
@@ -291,8 +295,8 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
     val weightR1R2 = relativeWeight(r1, r2, checkImplicits)
     val weightR2R1 = relativeWeight(r2, r1, checkImplicits)
     handler.foreach { h =>
-      h.addWeight(r1.element, r2.element, h.Weight(weightR1R2, weightR2R1))
-      h.addWeight(r2.element, r1.element, h.Weight(weightR2R1, weightR1R2))
+      h.addWeight(r1.element, r2.element, weightR1R2)
+      h.addWeight(r2.element, r1.element, weightR2R1)
     }
     weightR1R2 > weightR2R1
   }
@@ -301,17 +305,21 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
                                      noImplicit: Boolean): Option[InnerScalaResolveResult[T]] = {
     def calc(checkImplicits: Boolean): Option[InnerScalaResolveResult[T]] = {
       val a1iterator = applicable.iterator
+      var res = Option.empty[InnerScalaResolveResult[T]]
       while (a1iterator.hasNext) {
         val a1 = a1iterator.next()
         var break = false
         val a2iterator = applicable.iterator
-        while (a2iterator.hasNext && !break) {
+        while (a2iterator.hasNext && (!break || handler.nonEmpty)) { // TODO? all weights
           val a2 = a2iterator.next()
           if (a1 != a2 && !isMoreSpecific(a1, a2, checkImplicits)) break = true
         }
-        if (!break) return Some(a1)
+        if (!break) {
+          if (handler.isEmpty) return Some(a1)
+          else res = Some(a1)
+        }
       }
-      None
+      res
     }
     val result = calc(checkImplicits = false)
     if (!noImplicit && result.isEmpty) calc(checkImplicits = true)

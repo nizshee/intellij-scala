@@ -7,9 +7,11 @@ import com.intellij.ide.util.treeView.{AbstractTreeNode, AbstractTreeStructure, 
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
 import com.intellij.psi.PsiNamedElement
-import org.jetbrains.plugins.scala.actions.DCTreeStructureCompatibility.{CompatibilityNode, CompatibilityValue}
+import org.jetbrains.plugins.scala.actions.DCTreeStructureCompatibility.{CompatibilityNode, CompatibilityValue, MostSpecificNode, MostSpecificValue}
 import org.jetbrains.plugins.scala.actions.DCTreeStructureConformance.{ConditionNode, RelationNode}
 import org.jetbrains.plugins.scala.actions.DCTreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue, TypeVariableNode}
+import org.jetbrains.plugins.scala.lang.psi.types.ScalaTypeSystem
+import org.jetbrains.plugins.scala.lang.resolve.processor.MostSpecificUtil
 
 /**
   * Created by user on 4/10/17.
@@ -60,6 +62,9 @@ class DCTreeStructureResolver(values: Seq[DCTreeStructureResolver.Value])(implic
     case n: TypeVariableNode =>
       val children = n.getChildren
       children.toArray(new Array[AnyRef](children.size))
+    case n: MostSpecificNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
     case _ => Array.empty
   }
 
@@ -71,6 +76,7 @@ class DCTreeStructureResolver(values: Seq[DCTreeStructureResolver.Value])(implic
 }
 
 object DCTreeStructureResolver {
+//  @inline private def el2String(el: PsiNamedElement): String = MostSpecificUtil(el, 0)(ScalaTypeSystem).getType(el, implicitCase = false).toString
   @inline private def el2String(el: PsiNamedElement): String = el.getNode.getText
 
   case class Value(el: PsiNamedElement, candidate: DCHandler.Resolver#Candidate, prefix: String = "")
@@ -124,7 +130,7 @@ object DCTreeStructureResolver {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
       weight.weights.foreach { case (el, w) =>
-        list.add(new WeightSubNode(project, WeightValue(el, w)))
+        list.add(new WeightSubNode(WeightValue(el, w)))
       }
       list
     }
@@ -137,14 +143,18 @@ object DCTreeStructureResolver {
     }
   }
 
-  class WeightSubNode(project: Project, weight: WeightValue) extends AbstractTreeNode[WeightValue](project, weight) {
+  class WeightSubNode(value: WeightValue)(implicit project: Project) extends AbstractTreeNode[WeightValue](project, value) {
+    private val asSpecificAs = value.weight.asSpecificAs.map(s => new MostSpecificNode(MostSpecificValue(s)))
+
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
-      new util.ArrayList[AbstractTreeNode[_]]()
+      val list = new util.ArrayList[AbstractTreeNode[_]]()
+      asSpecificAs.foreach(list.add)
+      list
     }
 
     override def update(presentationData: PresentationData): Unit = {
-      presentationData.setPresentableText(s"${weight.weight.v} (${weight.weight.opposite}) ${el2String(weight.el)}")
-      if (weight.weight.v <= weight.weight.opposite)
+      presentationData.setPresentableText(s"${value.weight.v} (${value.weight.opposite}) ${el2String(value.el)}")
+      if (value.weight.v <= value.weight.opposite)
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
   }

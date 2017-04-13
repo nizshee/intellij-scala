@@ -9,7 +9,7 @@ import com.intellij.psi._
 import com.intellij.psi.impl.compiled.ClsParameterImpl
 import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.annotations.TestOnly
-import org.jetbrains.plugins.scala.actions.{DCHandler, DebugConformanceAction}
+import org.jetbrains.plugins.scala.actions.{DCHandler, DebugConformanceAction, DebugConformanceAdapter, Relation}
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api.InferUtil
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
@@ -229,9 +229,10 @@ object Compatibility {
             handler.foreach { h =>
               h.log(s"find constaints to $exprType >: $paramType")
               val cHandler = h.handler
-              val (_, subst) = typeSystem.conformance.conformsInner(exprType, paramType,
+              val (_, subst) = typeSystem.conformance.conformsInner(paramType, exprType,
                 substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = Some(cHandler))
-              h + h.Arg(param.name, exprType, paramType, subst, cHandler.conditions, cHandler.undefinedTypes)
+              h + h.Arg(param.name, exprType, paramType, subst,
+                DebugConformanceAdapter(Relation.Conformance(exprType, paramType, cHandler.conditions)).conditions) // TODO? ugly
             }
             val conforms = exprType.weakConforms(paramType) // TODO? calculates two times, i'll add third
             matched ::=(param, expr.expr)

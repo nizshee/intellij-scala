@@ -161,7 +161,7 @@ object ReferenceExpressionResolver {
       }
     }
     handler.foreach { h =>
-      h.log(s"processor returned result ${result.toList}")
+      h.log(s"processor returned result ${result.toList.map(_.getElement.getNode.getText)}")
     }
     if (result.isEmpty && reference.isAssignmentOperator) {
       handler.foreach { h =>

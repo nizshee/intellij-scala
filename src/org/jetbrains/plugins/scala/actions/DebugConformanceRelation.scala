@@ -1,10 +1,8 @@
 package org.jetbrains.plugins.scala.actions
 
-import org.jetbrains.plugins.scala.lang.psi.api.statements.params.ScTypeParam
-import org.jetbrains.plugins.scala.lang.psi.types.api.designator.ScProjectionType
-import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScParameterizedType, ScType}
-import org.jetbrains.plugins.scala.lang.psi.types.api.{ParameterizedType, StdType, TypeParameterType, UndefinedType}
+import org.jetbrains.plugins.scala.lang.psi.types.api.{ParameterizedType, UndefinedType}
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.ScMethodType
+import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScType}
 
 
 sealed trait ConformanceCondition {
@@ -81,6 +79,10 @@ object ConformanceCondition {
     override def satisfy: Boolean = true
   }
 
+  case class UndefinedLower(left: UndefinedType, right: UndefinedType) extends ConformanceCondition {
+    override def satisfy: Boolean = ???
+  }
+
 }
 
 sealed trait Relation {
@@ -93,4 +95,14 @@ object Relation {
   case class Conformance(left: ScType, right: ScType, conditions: Seq[ConformanceCondition]) extends Relation {
     def satisfy: Boolean = conditions.exists(_.satisfy)
   }
+}
+
+sealed trait AsSpecificAsCondition {
+  def satisfy: Boolean
+}
+
+object AsSpecificAsCondition {
+  case class Method(left: ScType, right: ScType, satisfy: Boolean) extends AsSpecificAsCondition
+  case class Polymorphic(satisfy: Boolean) extends AsSpecificAsCondition
+  case class Other(left: ScType, right: ScType, satisfy: Boolean) extends AsSpecificAsCondition
 }

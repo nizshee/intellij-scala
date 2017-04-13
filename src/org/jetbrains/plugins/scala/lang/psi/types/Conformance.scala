@@ -296,7 +296,6 @@ object Conformance extends api.Conformance {
         handler.foreach { h =>
           h.rvisit("UndefinedSubstVisitor - ok")
           h + ConformanceCondition.Undefined(l, u, l) // TODO? add subst; where upper, lower?
-          h + u
         }
         result = (true, undefinedSubst.addUpper(u.parameterType.nameAndId, l))
       }
@@ -361,7 +360,6 @@ object Conformance extends api.Conformance {
         handler.foreach(_ + ConformanceCondition.Equivalent(Relation.Equivalence(l, r, satisfy = true)))
         result = isEquiv
       }
-      else handler.foreach(_ + ConformanceCondition.Equivalent(Relation.Equivalence(l, r, satisfy = false)))
     }
 
     trait ExistentialSimplification extends ScalaTypeVisitor { // TODO ???? simplifies existential
@@ -1842,17 +1840,22 @@ object Conformance extends api.Conformance {
         override def visitUndefinedType(u2: UndefinedType) {
           val name = u2.parameterType.nameAndId
           result = (true, if (u2.level > u.level) {
+            handler.foreach(_ + ConformanceCondition.Undefined(u2, u, u2)) // TODO?
             undefinedSubst.addUpper(name, u)
           } else if (u.level > u2.level) {
+            handler.foreach(_ + ConformanceCondition.Undefined(u2, u, u2)) // TODO?
             undefinedSubst.addUpper(name, u) // TODO? really?
           } else {
+            handler.foreach(_ + ConformanceCondition.Undefined(u2, u, u2)) // TODO?
             undefinedSubst
           })
         }
       }
       r.visitType(rightVisitor)
-      if (result == null)
+      if (result == null) {
+        handler.foreach(_ + ConformanceCondition.Undefined(r, u, r)) // TODO?
         result = (true, undefinedSubst.addLower(u.parameterType.nameAndId, r))
+      }
     }
 
     override def visitMethodType(m1: ScMethodType) {

@@ -23,15 +23,6 @@ object DCHandler {
 //    private val offset = nesting * 1
 //    private val delimeter = if (offset < 1) "" else "|" * (offset - 1) + "|"
 
-    private var _undefinedTypes: Map[(String, Long), UndefinedType] = Map.empty
-
-    def +(undefinedType: UndefinedType): UndefinedType = {
-      _undefinedTypes += undefinedType.parameterType.nameAndId -> undefinedType
-      undefinedType
-    }
-
-    def undefinedTypes: Map[(String, Long), UndefinedType] = _undefinedTypes
-
     private var _conditions: Seq[ConformanceCondition] = Seq()
     private var _variances: Seq[ConformanceCondition.Variance] = Seq()
 
@@ -74,8 +65,7 @@ object DCHandler {
                    expectedType: ScType,
                    actualType: ScType,
                    undefinedSubstitutor: ScUndefinedSubstitutor,
-                   conditions: Seq[ConformanceCondition],
-                   /*remove*/ undefinedTypes: Map[(String, Long), UndefinedType]) {
+                   conditions: Seq[ConformanceCondition]) {
       def satisfy: Boolean = conditions.exists(_.satisfy)
     }
 
@@ -103,14 +93,9 @@ object DCHandler {
 
     private var _restrictions: Seq[Restriction] = Seq.empty
 
-    def +(restriction: Restriction): Restriction = {
-      _restrictions :+= restriction
-      restriction
-    }
-
     def +(name: (String, Long)): Restriction = {
       val restriction = Restriction(name, None, Set.empty, Set.empty)
-      _restrictions :+= restriction
+      _restrictions = restriction +: _restrictions
       restriction
     }
 
@@ -142,11 +127,13 @@ object DCHandler {
   }
 
   class Resolver(delimter: String, debug: Boolean) extends DCHandler(delimter, debug) {
-    case class Weight(v: Int, opposite: Int)
+
+    case class Weight(v: Int, opposite: Int, asSpecificAs: Option[AsSpecificAsCondition], derived: Option[Nothing])
     case class Candidate(rr: Option[ScalaResolveResult],
                          weights: Map[PsiNamedElement, Weight],
                          args: Seq[DCHandler.Compatibility#Arg],
                          restrictions: Seq[DCHandler.Substitutor#Restriction])
+
     private var last: Option[PsiNamedElement] = None
     private var _candidates: Map[PsiNamedElement, Candidate] = Map.empty
 
@@ -189,6 +176,34 @@ object DCHandler {
           )
         case _ =>
       }
+    }
+
+    def addWeight(left: PsiNamedElement, right: PsiNamedElement, v: Int): Unit = {
+      val candidate = _candidates.getOrElse(left, Candidate(None, Map.empty, Seq.empty, Seq.empty))
+      val weight = candidate.weights.getOrElse(right, Weight(0, 0, None, None))
+      _candidates += left -> candidate.copy(
+        weights = candidate.weights.updated(right, weight.copy(v = v))
+      )
+
+      val rCandidate = _candidates.getOrElse(right, Candidate(None, Map.empty, Seq.empty, Seq.empty))
+      val rWeight = rCandidate.weights.getOrElse(left, Weight(0, 0, None, None))
+      _candidates += right -> rCandidate.copy(
+        weights = rCandidate.weights.updated(left, rWeight.copy(opposite = v))
+      )
+    }
+
+    def addWeight(left: PsiNamedElement, right: PsiNamedElement, asSpecificAs: AsSpecificAsCondition): Unit = {
+      val candidate = _candidates.getOrElse(left, Candidate(None, Map.empty, Seq.empty, Seq.empty))
+      val weight = candidate.weights.getOrElse(right, Weight(0, 0, None, None))
+      _candidates += left -> candidate.copy(
+        weights = candidate.weights.updated(right, weight.copy(asSpecificAs = Some(asSpecificAs)))
+      )
+
+      val rCandidate = _candidates.getOrElse(right, Candidate(None, Map.empty, Seq.empty, Seq.empty))
+      val rWeight = rCandidate.weights.getOrElse(left, Weight(0, 0, None, None))
+      _candidates += right -> rCandidate.copy(
+        weights = rCandidate.weights.updated(left, rWeight.copy(/*opposite = rWeight.opposite + 1*/))
+      )
     }
 
     def clear(): Unit = {
