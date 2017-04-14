@@ -507,9 +507,7 @@ object ReferenceExpressionResolver {
     }
 
     def processType(aType: ScType, e: ScExpression, processor: BaseProcessor): BaseProcessor = {
-      handler.foreach { h =>
-        h.logn("processType")
-      }
+      handler.foreach(_.logn("processType"))
       val shape = processor match {
         case m: MethodResolveProcessor => m.isShapeResolve
         case _ => false
@@ -563,9 +561,7 @@ object ReferenceExpressionResolver {
     }
 
     def processDynamic(`type`: ScType, e: ScExpression, baseProcessor: BaseProcessor): BaseProcessor = {
-      handler.foreach { h =>
-        h.logn("processDynamic")
-      }
+      handler.foreach(_.logn("processDynamic"))
       ScalaPsiManager.instance(ref.getProject).getCachedClass(ref.getResolveScope, "scala.Dynamic").map {
         ScDesignatorType(_)
       }.filter {
@@ -605,9 +601,7 @@ object ReferenceExpressionResolver {
     }
 
     def collectImplicits(e: ScExpression, processor: BaseProcessor, noImplicitsForArgs: Boolean) {
-      handler.foreach { h =>
-        h.logn("collectImplicits")
-      }
+      handler.foreach(_.logn("collectImplicits"))
       def builder(result: ImplicitResolveResult): ResolverStateBuilder = {
         ProgressManager.checkCanceled()
         new ImplicitResolveResult.ResolverStateBuilder(result).withImports
@@ -649,9 +643,7 @@ object ReferenceExpressionResolver {
         processTypes(q, processor)
     }
     val res = actualProcessor.rrcandidates
-    handler.foreach { h =>
-      h.logn(s"actualPorcessor rrcanidates are ${res.toList}")
-    }
+    handler.foreach(_.logn(s"actualPorcessor rrcanidates are ${res.toList}"))
     if (accessibilityCheck && res.length == 0) return doResolve(ref, processor, accessibilityCheck = false, handler = handler)
     res
   }

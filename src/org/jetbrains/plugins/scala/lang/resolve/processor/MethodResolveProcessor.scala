@@ -629,18 +629,14 @@ object MethodResolveProcessor {
     if (filtered.isEmpty) filtered = mapped.filter(_.isApplicableInternal(withExpectedType = false))
 
     if (filtered.isEmpty && !noImplicitsForArgs) {
-      handler.foreach { h =>
-        h.log("try with implicits")
-      }
+      handler.foreach(_.log("try with implicits"))
       //check with implicits
       mapped = mapper(applicationImplicits = true)
       filtered = mapped.filter(_.isApplicableInternal(withExpectedType = true))
       if (filtered.isEmpty) filtered = mapped.filter(_.isApplicableInternal(withExpectedType = false))
     }
 
-    handler.foreach { h =>
-      h.log(s"after filter $filtered")
-    }
+    handler.foreach(_.log(s"after filter $filtered"))
 
     val onlyValues = mapped.forall { r => // TODO? what it means
       r.element match {
