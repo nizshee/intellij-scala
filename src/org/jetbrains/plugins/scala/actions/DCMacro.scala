@@ -24,9 +24,11 @@ object generateInstrumentationMacro {
     * NonInstrumentated version `f` not contains constructions connected with instrumental tool like:
     *   - arguments `parameterName: Option[???] = None`
     *   - applications like parameterName.foreach { _ => }
-    *   - new values ontained with transformations like `val inner = handler.map(_ => ???)` (not works with def) (define then use)
+    *   - new values obtained with transformations like `val inner = handler.map(_ => ???)` (not works with def) (not looks forward)
+    *   - simplify boolean expressions like `a && handler.isEmpty`
+    *   - parameters in function calls like `g(..., handler = inner)`
     * Instrumentated version `f$I` contains all constructions and transforms all connected functions calls:
-    *   - g(..., handler = inner) -> g$I(..., handler = inner)
+    *   - `g(..., handler = inner)` -> `g$I(..., handler = inner)`
     */
   def impl(c: Context)(annottees: c.Expr[Any]*): c.Expr[Any] = {
     import c.universe._
@@ -191,7 +193,7 @@ object generateInstrumentationMacro {
         val instrumented = generateInstrumentedClass(clazz)
         println(nonIstrumented)
         println(showRaw(nonIstrumented))
-        (clazz, instrumented :: rest)
+        (clazz, nonIstrumented :: instrumented :: rest)
       case (param: ValDef) :: (rest @ (_ :: _)) => (param, rest)
       case (param: TypeDef) :: (rest @ (_ :: _)) => (param, rest)
       case _ => (EmptyTree, inputs)

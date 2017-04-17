@@ -56,9 +56,10 @@ def myMethod(handler: Option[DCHandler] = None): Int = {
   1
 }
 
-@uninstrumental("i")
+@uninstrumental("handler")
 def myInnerMethod(i: Int, handler: Option[DCHandler] = None): Int = {
   handler.foreach(_.log("!!!"))
+  new MyClass(i, handler)
   2
 }
 
@@ -67,14 +68,14 @@ trait A {
 }
 
 
-@uninstrumental("a")
+@uninstrumental("handler")
 class MyClass(i: Int, handler: Option[DCHandler]) extends A {
 
   handler.foreach { h =>
     h.log("???")
   }
 
-  myInnerMethod(a, handler)
+//  myInnerMethod(a, handler)
 
   override val a = 2
 }
