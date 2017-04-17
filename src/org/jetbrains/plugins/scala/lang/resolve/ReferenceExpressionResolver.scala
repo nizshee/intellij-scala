@@ -105,8 +105,6 @@ object ReferenceExpressionResolver {
     val name = if (reference.isUnaryOperator) "unary_" + reference.refName else reference.refName
     val info = getContextInfo(reference, reference)
 
-    val _handler = handler
-
     //expectedOption different for cases
     // val a: (Int) => Int = foo
     // and for case
@@ -120,9 +118,7 @@ object ReferenceExpressionResolver {
     def processor(smartProcessor: Boolean): MethodResolveProcessor =
       new MethodResolveProcessor(reference, name, info.arguments.toList,
         getTypeArgs(reference), prevInfoTypeParams, kinds(reference, reference, incomplete), expectedOption,
-        info.isUnderscore, shapesOnly, enableTupling = true) {
-
-        override protected val handler: Option[Resolver] = _handler
+        info.isUnderscore, shapesOnly, enableTupling = true, handler = handler) {
 
         override def candidatesS: Set[ScalaResolveResult] = {
           if (!smartProcessor) super.candidatesS

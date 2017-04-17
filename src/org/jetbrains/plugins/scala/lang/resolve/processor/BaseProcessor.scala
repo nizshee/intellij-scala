@@ -51,7 +51,6 @@ object BaseProcessor {
 abstract class BaseProcessor(val kinds: Set[ResolveTargets.Value])
                             (implicit val typeSystem: TypeSystem) extends PsiScopeProcessor {
   protected val candidatesSet: mutable.HashSet[ScalaResolveResult] = new mutable.HashSet[ScalaResolveResult]
-  protected val handler: Option[DCHandler.Resolver] = None
 
   def isImplicitProcessor: Boolean = false
 

@@ -1,51 +1,85 @@
 import org.jetbrains.plugins.scala.actions.uninstrumental
+import org.jetbrains.plugins.scala.actions.instrumentated
 import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.actions
 
-//@identity
-//class C
-//
-//@identity class D; object D
-//
-//new C
-//
-//new D
-//
-//def twice[@identity T](@identity x: Int) = x * 2
+
+object a {
+  val boolean = true
+  val boolean1 = false
+}
 
 
 //@uninstrumental("handler")
-def myMethod(handler: Option[DCHandler.Resolver] = None): Int = {
+def myMethod(handler: Option[DCHandler] = None): Int = {
 
-  class A(had: Int) {
-    handler += 1
-    var handler = 1
+  if (a.boolean && a.boolean1 && handler.isEmpty) {
+    1 + 2
   }
 
+  if (handler.nonEmpty || (a.boolean && a.boolean1 && handler.isEmpty)) {
+    1 + 1
+  }
+
+//  class A(had: Int, var a: Int) {
+//    println(had)
+//    var handler = 1
+//    handler += 1
+//  }
+//
 //  handler.foreach { h =>
 //    h.log("???")
 //  }
 //
-//  object a {
-//    var handler = 1
-//  }
-//
 //  def f() = {
-//    handler.foreach(_.log("111"))
-////    1
+//    handler.foreach(_.log("222"))
+//    1
 //  }
 //
 //  def g() = {
 //    val handler = 1 // should remove after val
 //    handler + 1
 //  }
+//
+//  def h(handler: Int) = {
+//    handler + 1
+//  }
+//
+//  handler.foreach { h =>
+//    h.log("???")
+//  }
 
-  def h(handler: Int) = {
-    handler + 1
-  }
+//  val inner = handler.map(h => h)
+//  val i = inner.map(i => i)
+//  myInnerMethod(1, handler = inner)
+//  myInnerMethod(2, i)
+  1
+}
 
+@uninstrumental("i")
+def myInnerMethod(i: Int, handler: Option[DCHandler] = None): Int = {
+  handler.foreach(_.log("!!!"))
   2
 }
+
+trait A {
+  val a = 1
+}
+
+
+@uninstrumental("a")
+class MyClass(i: Int, handler: Option[DCHandler]) extends A {
+
+  handler.foreach { h =>
+    h.log("???")
+  }
+
+  myInnerMethod(a, handler)
+
+  override val a = 2
+}
+
+new MyClass$I(1, None)
 
 
 myMethod()

@@ -42,7 +42,8 @@ class MethodResolveProcessor(override val ref: PsiElement,
                              val enableTupling: Boolean = false,
                              var noImplicitsForArgs: Boolean = false,
                              val selfConstructorResolve: Boolean = false,
-                             val isDynamic: Boolean = false)
+                             val isDynamic: Boolean = false,
+                             handler: Option[DCHandler.Resolver] = None)
                             (implicit override val typeSystem: TypeSystem)
   extends ResolveProcessor(kinds, ref, refName) {
 
@@ -154,7 +155,7 @@ class MethodResolveProcessor(override val ref: PsiElement,
     }
     if (!isShapeResolve && enableTupling && argumentClauses.nonEmpty) {
       isShapeResolve = true
-      val cand1 = MethodResolveProcessor.candidates(this, input)
+      val cand1 = MethodResolveProcessor.candidates(this, input, handler = handler)
       handler.foreach(_.log(s"candidates afrer shape resolve $cand1"))
       if (!isDynamic && (cand1.isEmpty || cand1.forall(_.tuplingUsed))) {
         handler.foreach(_.log("shape resolve gives nothing && tupling case - skip"))
@@ -163,22 +164,22 @@ class MethodResolveProcessor(override val ref: PsiElement,
         val oldArg = argumentClauses
         val tpl = ScalaPsiUtil.tuplizy(argumentClauses.head, ref.getResolveScope, ref.getManager, ScalaPsiUtil.firstLeaf(ref))
         if (tpl.isEmpty) {
-          return MethodResolveProcessor.candidates(this, input)
+          return MethodResolveProcessor.candidates(this, input, handler = handler)
         }
         argumentClauses = tpl.toList
-        val res = MethodResolveProcessor.candidates(this, input)
+        val res = MethodResolveProcessor.candidates(this, input, handler = handler)
         argumentClauses = oldArg
         if (res.forall(!_.isApplicable())) {
-          return MethodResolveProcessor.candidates(this, input)
+          return MethodResolveProcessor.candidates(this, input, handler = handler)
         }
         res.map(r => r.copy(tuplingUsed = true))
       } else {
         isShapeResolve = false
         handler.foreach(_.log("normal resolve"))
-        MethodResolveProcessor.candidates(this, input)
+        MethodResolveProcessor.candidates(this, input, handler = handler)
       }
     } else
-      MethodResolveProcessor.candidates(this, input)
+      MethodResolveProcessor.candidates(this, input, handler)
     }
   }
 
@@ -522,7 +523,7 @@ object MethodResolveProcessor {
     }
   }
 
-  def candidates(proc: MethodResolveProcessor, _input: Set[ScalaResolveResult]): Set[ScalaResolveResult] = {
+  def candidates(proc: MethodResolveProcessor, _input: Set[ScalaResolveResult], handler: Option[DCHandler.Resolver]): Set[ScalaResolveResult] = {
     import proc._
 
     //We want to leave only fields and properties from inherited classes, this is important, because
