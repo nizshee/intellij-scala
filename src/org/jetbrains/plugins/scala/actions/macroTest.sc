@@ -1,7 +1,7 @@
-import org.jetbrains.plugins.scala.actions.uninstrumental
-import org.jetbrains.plugins.scala.actions.instrumentated
+
 import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.actions
+import org.jetbrains.plugins.scala.macroAnnotations.{instrumentated, uninstrumental}
 
 
 object a {

@@ -1,14 +1,12 @@
-package org.jetbrains.plugins.scala.actions
+package org.jetbrains.plugins.scala.macroAnnotations
 
-import scala.reflect.macros.whitebox.Context
-import scala.language.experimental.macros
-import scala.annotation.StaticAnnotation
-import scala.annotation.compileTimeOnly
+import java.io.PrintWriter
+
+import scala.annotation.{StaticAnnotation, compileTimeOnly}
 import scala.collection.immutable.{::, Nil}
+import scala.language.experimental.macros
+import scala.reflect.macros.whitebox.Context
 
-
-@compileTimeOnly("for explicit generation")
-class instrumentated extends StaticAnnotation
 
 @compileTimeOnly("generate two methods / classes")
 class uninstrumental(parameterName: String) extends StaticAnnotation {
@@ -19,6 +17,9 @@ class uninstrumental(parameterName: String) extends StaticAnnotation {
   *   - multiple constructors
   */
 object generateInstrumentationMacro {
+
+  private def printToFile(s: String) = new PrintWriter("tmpFile") { write(s); close() }
+
   /**
     * Generates from annotated method / class `f` two methods `f` and `f$I`.
     * NonInstrumentated version `f` not contains constructions connected with instrumental tool like:
@@ -63,53 +64,19 @@ object generateInstrumentationMacro {
 
     }
 
-    def instrumentedTransformer(init: Set[String] = Set(parameter)) = new Transformer {
-      private var instrumentation = init
-
-      override def transform(tree: c.universe.Tree): c.universe.Tree = tree match {
-        case Apply(Select(New(Ident(TypeName(name))), TermName("<init>")), args) =>
-          val nName = name + "$I"
-          super.transform(Apply(Select(New(Ident(TypeName(nName))), TermName("<init>")), args))
-        case f@DefDef(_, _, _, args, _, _) =>
-          val names = args.flatMap(_.collect { case ValDef(_, TermName(name), _, _) => name }).toSet
-          val permitted = instrumentation.intersect(names)
-          instrumentation --= permitted
-          val res = super.transform(f)
-          instrumentation ++= permitted
-          res
-        case c@ClassDef(_, _, _, Template(_, _, body)) =>
-          val (_, nForbidden) = prepareBlock(body, instrumentation, remove = false)
-          val pForbidden = instrumentation
-          instrumentation = nForbidden
-          val res = super.transform(c)
-          instrumentation = pForbidden
-          res
-        case b@Block(body, _) =>
-          val (_, nForbidden) = prepareBlock(body, instrumentation, remove = false)
-          val pForbidden = instrumentation
-          instrumentation = nForbidden
-          val res = super.transform(b)
-          instrumentation = pForbidden
-          res
-        case Apply(Ident(TermName(fName)), args) =>
-          val contains = args.exists {
-            case Ident(TermName(name)) => instrumentation(name)
-            case AssignOrNamedArg(_, Ident(TermName(name))) => instrumentation(name)
-            case _ => false
-          }
-          val nName = if (contains) fName + "$I" else fName
-          super.transform(Apply(Ident(TermName(nName)), args))
-        case _ => super.transform(tree)
-      }
-    }
-
     def nonInstrumentedTransformer(init: Set[String] = Set(parameter)) = new Transformer {
       private var instrumentation = init
+      private var debug = false
 
       override def transform(tree: c.universe.Tree): c.universe.Tree = tree match {
         case f@DefDef(mods, TermName("<init>"), targs, args, tpt, rhs) =>
+          println(showRaw(f))
           val nArgs = args.map(_.filterNot { case ValDef(_, TermName(name), _, _) => instrumentation(name) })
-          super.transform(DefDef(mods, TermName("<init>"), targs, nArgs, tpt, rhs))
+          debug = true
+          val r = super.transform(DefDef(mods, TermName("<init>"), targs, nArgs, tpt, rhs))
+          debug = false
+          println(showRaw(r))
+          r
         case Apply(Ident(TermName("<init>")), args) =>
           val nArgs = args.filterNot {
             case Ident(TermName(name)) => instrumentation(name)
@@ -147,7 +114,7 @@ object generateInstrumentationMacro {
           if instrumentation(name) => transform(term)
         case Apply(Select(Select(Ident(TermName(name)), TermName("nonEmpty")), TermName("$bar$bar")), List(term))
           if instrumentation(name) => transform(term)
-        case Apply(fun, args) =>
+        case a@Apply(fun, args) if a != pendingSuperCall => // pendingSuperCall matches on Apply and ruins final ast
           val nArgs = args.filterNot {
             case Ident(TermName(name)) => instrumentation(name)
             case AssignOrNamedArg(_, Ident(TermName(name))) => instrumentation(name)
@@ -156,6 +123,51 @@ object generateInstrumentationMacro {
           super.transform(Apply(fun, nArgs))
         case TermName(name) if instrumentation(name) =>
           c.abort(c.enclosingPosition, s"There is a not cut forbidden name $name.")
+        case _ => super.transform(tree)
+      }
+    }
+
+    def instrumentedTransformer(init: Set[String] = Set(parameter)) = new Transformer {
+      private var instrumentation = init
+
+      override def transform(tree: c.universe.Tree): c.universe.Tree = tree match {
+        case Apply(Select(New(Ident(TypeName(cName))), TermName("<init>")), args) =>
+          val contains = args.exists {
+            case Ident(TermName(name)) => instrumentation(name)
+            case AssignOrNamedArg(_, Ident(TermName(name))) => instrumentation(name)
+            case _ => false
+          }
+          val nName = if (contains) cName + "$I" else cName
+          super.transform(Apply(Select(New(Ident(TypeName(nName))), TermName("<init>")), args))
+        case f@DefDef(_, _, _, args, _, _) =>
+          val names = args.flatMap(_.collect { case ValDef(_, TermName(name), _, _) => name }).toSet
+          val permitted = instrumentation.intersect(names)
+          instrumentation --= permitted
+          val res = super.transform(f)
+          instrumentation ++= permitted
+          res
+        case c@ClassDef(_, _, _, Template(_, _, body)) =>
+          val (_, nForbidden) = prepareBlock(body, instrumentation, remove = false)
+          val pForbidden = instrumentation
+          instrumentation = nForbidden
+          val res = super.transform(c)
+          instrumentation = pForbidden
+          res
+        case b@Block(body, _) =>
+          val (_, nForbidden) = prepareBlock(body, instrumentation, remove = false)
+          val pForbidden = instrumentation
+          instrumentation = nForbidden
+          val res = super.transform(b)
+          instrumentation = pForbidden
+          res
+        case a@Apply(Ident(TermName(fName)), args) if a != pendingSuperCall =>
+          val contains = args.exists {
+            case Ident(TermName(name)) => instrumentation(name)
+            case AssignOrNamedArg(_, Ident(TermName(name))) => instrumentation(name)
+            case _ => false
+          }
+          val nName = if (contains) fName + "$I" else fName
+          super.transform(Apply(Ident(TermName(nName)), args))
         case _ => super.transform(tree)
       }
     }
@@ -194,26 +206,30 @@ object generateInstrumentationMacro {
         ClassDef(mods, TypeName(nName), targs, Template(parents, self, nBody))
     }
 
+
     val inputs = annottees.map(_.tree).toList
     val (annottee, expandees) = inputs match {
       case (func: DefDef) :: rest => // method case
         val nonIntrumented = generateNonInstrumented(func)
         val instrumented = genetateInstrumented(func)
-        println(nonIntrumented)
-        println(instrumented)
-        println(showRaw(instrumented))
-        (func, nonIntrumented :: instrumented :: rest)
+
+//        println(showRaw(func))
+//        println(showRaw(nonIntrumented))
+//        println(show(instrumented))
+//        println(showRaw(instrumented))
+        (func, nonIntrumented/* :: instrumented*/ :: rest)
       case (clazz: ClassDef) :: rest =>
         val nonIstrumented = generateNonInstrumentedClass(clazz)
         val instrumented = generateInstrumentedClass(clazz)
-        println(nonIstrumented)
-        println(instrumented)
-        (clazz, nonIstrumented :: instrumented :: rest)
+//        println(nonIstrumented)
+//        println(instrumented)
+        (clazz, nonIstrumented /*:: instrumented*/ :: rest)
       case (param: ValDef) :: (rest @ (_ :: _)) => (param, rest)
       case (param: TypeDef) :: (rest @ (_ :: _)) => (param, rest)
       case _ => (EmptyTree, inputs)
     }
 
+//    c.Expr[Any](expandees.head)
     c.Expr[Any](Block(expandees, Literal(Constant(()))))
   }
 }

@@ -33,6 +33,7 @@ import org.jetbrains.plugins.scala.lang.resolve.processor.DynamicResolveProcesso
 import org.jetbrains.plugins.scala.lang.resolve.processor._
 import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.actions.DCHandler.Resolver
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
 
 import scala.annotation.tailrec
 import scala.collection.Set
@@ -101,6 +102,7 @@ object ReferenceExpressionResolver {
     }
   }
 
+  @uninstrumental("handler")
   def resolve(reference: ScReferenceExpression, shapesOnly: Boolean, incomplete: Boolean, handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
     val name = if (reference.isUnaryOperator) "unary_" + reference.refName else reference.refName
     val info = getContextInfo(reference, reference)
@@ -118,7 +120,7 @@ object ReferenceExpressionResolver {
     def processor(smartProcessor: Boolean): MethodResolveProcessor =
       new MethodResolveProcessor(reference, name, info.arguments.toList,
         getTypeArgs(reference), prevInfoTypeParams, kinds(reference, reference, incomplete), expectedOption,
-        info.isUnderscore, shapesOnly, enableTupling = true, handler = handler) {
+        info.isUnderscore, shapesOnly, enableTupling = true, handler = handler) { // TODO? uncoment
 
         override def candidatesS: Set[ScalaResolveResult] = {
           if (!smartProcessor) super.candidatesS
@@ -172,6 +174,7 @@ object ReferenceExpressionResolver {
     }
   }
 
+//  @uninstrumental("handler")
   def doResolve(ref: ScReferenceExpression, processor: BaseProcessor, accessibilityCheck: Boolean = true,
                 handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
     implicit val manager = ref.getManager
