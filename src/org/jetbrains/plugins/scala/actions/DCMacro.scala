@@ -15,8 +15,8 @@ class uninstrumental(parameterName: String) extends StaticAnnotation {
   def macroTransform(annottees: Any*): Any = macro generateInstrumentationMacro.impl
 }
 
-/** todo
-  * create class with new
+/** bugs:
+  *   - multiple constructors
   */
 object generateInstrumentationMacro {
   /**
@@ -67,6 +67,9 @@ object generateInstrumentationMacro {
       private var instrumentation = init
 
       override def transform(tree: c.universe.Tree): c.universe.Tree = tree match {
+        case Apply(Select(New(Ident(TypeName(name))), TermName("<init>")), args) =>
+          val nName = name + "$I"
+          super.transform(Apply(Select(New(Ident(TypeName(nName))), TermName("<init>")), args))
         case f@DefDef(_, _, _, args, _, _) =>
           val names = args.flatMap(_.collect { case ValDef(_, TermName(name), _, _) => name }).toSet
           val permitted = instrumentation.intersect(names)
@@ -95,7 +98,7 @@ object generateInstrumentationMacro {
             case _ => false
           }
           val nName = if (contains) fName + "$I" else fName
-          Apply(Ident(TermName(nName)), args)
+          super.transform(Apply(Ident(TermName(nName)), args))
         case _ => super.transform(tree)
       }
     }
@@ -104,6 +107,17 @@ object generateInstrumentationMacro {
       private var instrumentation = init
 
       override def transform(tree: c.universe.Tree): c.universe.Tree = tree match {
+        case f@DefDef(mods, TermName("<init>"), targs, args, tpt, rhs) =>
+          val nArgs = args.map(_.filterNot { case ValDef(_, TermName(name), _, _) => instrumentation(name) })
+          super.transform(DefDef(mods, TermName("<init>"), targs, nArgs, tpt, rhs))
+        case Apply(Ident(TermName("<init>")), args) =>
+          val nArgs = args.filterNot {
+            case Ident(TermName(name)) => instrumentation(name)
+            case AssignOrNamedArg(Ident(TermName(name)), _) => instrumentation(name)
+            case AssignOrNamedArg(_, Ident(TermName(name))) => instrumentation(name)
+            case _ => false
+          }
+          super.transform(Apply(Ident(TermName("<init>")), nArgs))
         case f@DefDef(_, _, _, args, _, _) =>
           val names = args.flatMap(_.collect { case ValDef(_, TermName(name), _, _) => name }).toSet
           val permitted = instrumentation.intersect(names)
@@ -186,13 +200,14 @@ object generateInstrumentationMacro {
         val nonIntrumented = generateNonInstrumented(func)
         val instrumented = genetateInstrumented(func)
         println(nonIntrumented)
-        println(showRaw(nonIntrumented))
+        println(instrumented)
+        println(showRaw(instrumented))
         (func, nonIntrumented :: instrumented :: rest)
       case (clazz: ClassDef) :: rest =>
         val nonIstrumented = generateNonInstrumentedClass(clazz)
         val instrumented = generateInstrumentedClass(clazz)
         println(nonIstrumented)
-        println(showRaw(nonIstrumented))
+        println(instrumented)
         (clazz, nonIstrumented :: instrumented :: rest)
       case (param: ValDef) :: (rest @ (_ :: _)) => (param, rest)
       case (param: TypeDef) :: (rest @ (_ :: _)) => (param, rest)

@@ -69,18 +69,18 @@ trait A {
 
 
 @uninstrumental("handler")
-class MyClass(i: Int, handler: Option[DCHandler]) extends A {
+class MyClass(var i: Int, handler: Option[DCHandler]) extends A {
 
-  handler.foreach { h =>
-    h.log("???")
-  }
+//  def this(handler: Option[DCHandler]) = this(0, handler)
+
+  i += 1
 
 //  myInnerMethod(a, handler)
 
   override val a = 2
 }
 
-new MyClass$I(1, None)
+//new MyClass$I(1, None)
 
 
 myMethod()
