@@ -24,11 +24,13 @@ import org.jetbrains.plugins.scala.lang.psi.types.api._
 import org.jetbrains.plugins.scala.lang.psi.types.api.designator.ScProjectionType
 import org.jetbrains.plugins.scala.lang.psi.types.result.{Success, TypingContext}
 import org.jetbrains.plugins.scala.lang.psi.{ScalaPsiElement, ScalaPsiUtil}
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
 
 import scala.collection.Set
 import scala.collection.mutable.ArrayBuffer
 
 //todo: remove all argumentClauses, we need just one of them
+//@uninstrumental("handler")
 class MethodResolveProcessor(override val ref: PsiElement,
                              val refName: String,
                              var argumentClauses: List[Seq[Expression]],

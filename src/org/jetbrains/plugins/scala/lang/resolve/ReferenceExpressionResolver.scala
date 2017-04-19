@@ -102,7 +102,7 @@ object ReferenceExpressionResolver {
     }
   }
 
-  @uninstrumental("handler")
+//  @uninstrumental("handler")
   def resolve(reference: ScReferenceExpression, shapesOnly: Boolean, incomplete: Boolean, handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
     val name = if (reference.isUnaryOperator) "unary_" + reference.refName else reference.refName
     val info = getContextInfo(reference, reference)
@@ -120,7 +120,7 @@ object ReferenceExpressionResolver {
     def processor(smartProcessor: Boolean): MethodResolveProcessor =
       new MethodResolveProcessor(reference, name, info.arguments.toList,
         getTypeArgs(reference), prevInfoTypeParams, kinds(reference, reference, incomplete), expectedOption,
-        info.isUnderscore, shapesOnly, enableTupling = true, handler = handler) { // TODO? uncoment
+        info.isUnderscore, shapesOnly, enableTupling = true, handler = handler) {
 
         override def candidatesS: Set[ScalaResolveResult] = {
           if (!smartProcessor) super.candidatesS

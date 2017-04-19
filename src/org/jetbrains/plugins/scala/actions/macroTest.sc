@@ -1,14 +1,26 @@
 
 import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.actions
-import org.jetbrains.plugins.scala.macroAnnotations.{instrumentated, uninstrumental}
+import org.jetbrains.plugins.scala.macroAnnotations.{identity, uninstrumental}
 
 
 object a {
   val boolean = true
   val boolean1 = false
 }
+/*
+@identity
+class D1(var b: Int) {
+  protected val a = 1
+}
 
+@identity
+class D2(var b$: Int) extends D1(1) {
+  override protected val a = 2
+
+  b += 1
+  b = b + 1
+}*/
 
 //@uninstrumental("handler")
 def myMethod(handler: Option[DCHandler] = None): Int = {
@@ -56,33 +68,85 @@ def myMethod(handler: Option[DCHandler] = None): Int = {
   1
 }
 
+
+////@uninstrumental("handler")
+//def myInnerMethod(i: Int, handler: Option[DCHandler] = None): Int = {
+//  handler.foreach(_.log("!!!"))
+//  new MyClass(i, handler)
+//  2
+//}trumental("handler")
+//def myInnerMethod(i: Int, handler: Option[DCHandler] = None): Int = {
+//  handler.foreach(_.log("!!!"))
+//  new MyClass(i, handler)
+//  2
+//}
+
+//@identity
+//case class D(private var a: Int, b: Int)
+//
+//@identity
+//class D1(a: Int, override val b: Int) extends D(a, b)
+
+//@identity
+class A(val a: Int)(b: Int) {
+  private def f = 1
+
+  val c: Int = 1
+
+  var d: Int = 2
+
+  def g: Int = f
+
+  protected def h: Int = f + 1
+}
+
+class B(a: Int) extends A(a)(a) {
+  private def f = 2
+
+  d += 1
+
+  override def g: Int = f
+
+  override protected def h: Int = f + 1
+}
+
+class C(i1: Int)(i2: Int)
+
+// case classes
+// override methods
+
 @uninstrumental("handler")
-def myInnerMethod(i: Int, handler: Option[DCHandler] = None): Int = {
+class MyClass(override val a: Int, var b: Int, handler: Option[DCHandler]) extends A(a)(b) {
+
+  val puba = 1
+  var pubb = 2
+  private val pa = 1
+  private var pb = 1
+
+//  val i1 = i + 1
+
+//  MyClass.method(this, handler)
+
   handler.foreach(_.log("!!!"))
-  new MyClass(i, handler)
-  2
+
+//  myInnerMethod(i, handler)
 }
 
-trait A {
-  val a = 1
+object MyClass {
+//  @uninstrumental("handler")
+  def method(c: MyClass, handler: Option[DCHandler]): Unit = {
+    handler.foreach(_.log("companion"))
+
+    println(c.b + 1)
+    ()
+  }
 }
 
+//new MyClass(1, 2, None)
 
-@uninstrumental("handler")
-class MyClass(var i: Int, handler: Option[DCHandler]) extends A {
-
-//  def this(handler: Option[DCHandler]) = this(0, handler)
-
-  i += 1
-
-//  myInnerMethod(a, handler)
-
-  override val a = 2
-}
-
-//new MyClass$I(1, None)
-
-
-myMethod()
-
-//myMethod$I(handler = None)
+//class I(i$: Int, handler: Option[DCHandler]) extends MyClass(i$, None) {
+//
+//  MyClass.method(this, handler)
+//
+//  handler.foreach(_.log("!!!"))
+//}

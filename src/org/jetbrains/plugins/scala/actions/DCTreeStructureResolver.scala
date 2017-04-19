@@ -10,8 +10,6 @@ import com.intellij.psi.PsiNamedElement
 import org.jetbrains.plugins.scala.actions.DCTreeStructureCompatibility.{CompatibilityNode, CompatibilityValue, MostSpecificNode, MostSpecificValue}
 import org.jetbrains.plugins.scala.actions.DCTreeStructureConformance.{ConditionNode, RelationNode}
 import org.jetbrains.plugins.scala.actions.DCTreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue, TypeVariableNode}
-import org.jetbrains.plugins.scala.lang.psi.types.ScalaTypeSystem
-import org.jetbrains.plugins.scala.lang.resolve.processor.MostSpecificUtil
 
 /**
   * Created by user on 4/10/17.
