@@ -39,44 +39,72 @@ object generateInstrumentationMacro {
       case _ => c.abort(c.enclosingPosition, "No parameter name was given!")
     }
 
-    def prepareBlock(body: List[Tree], instrumentation: Set[String], remove: Boolean, e: Option[String] = None): (List[Tree], Set[String]) = body match {
-      case Nil => (Nil, instrumentation)
+    def substitution(prev: String, next: String) = new Transformer {
+      private def containsShadow(body: List[Tree]): Boolean = body.exists {
+        case ValDef(_, TermName(name), _, _) => name == prev
+        case DefDef(_, TermName(name), _, _, _, _) => name == prev
+        case _ => false
+      }
+
+      override def transform(tree: c.universe.Tree): c.universe.Tree = tree match {
+        case Ident(TermName(name)) if name == prev => Ident(TermName(next))
+        case d@DefDef(_, _, _, args, _, _) =>
+          if (args.exists(_.exists { case ValDef(_, TermName(name), _, _) => name == prev })) d
+          else super.transform(d)
+        case b@Block(body, _) =>
+          if (containsShadow(body)) b
+          else super.transform(b)
+        case c@ClassDef(_, _, _, Template(_, _, body)) if !containsShadow(body) =>
+          if (containsShadow(body)) c
+          else super.transform(c)
+        case _ => super.transform(tree)
+      }
+    }
+
+    /**
+      * This method looks fresh nad instrumentated variables up to down.
+      * It is not correct sometimes but much easier.
+      */
+    def prepareBlock(body: List[Tree], instrumentation: Set[String], remove: Boolean, isUpper: Boolean): (List[Tree], Set[String]) = body match {
+      case Nil => (Nil, instrumentation) // TODO maybe not work in inner classes and we should permiss names
       case head :: tail => head match {
+        case ValDef(mods, TermName(name), tpt, rhs) if isUpper =>
+          val nMods = if (remove) mods else mods match {
+            case Modifiers(flags, n, annotations) =>
+              var nFlags = flags
+              if (!mods.hasFlag(Flag.PRIVATE) && !mods.hasFlag(Flag.MUTABLE)) nFlags |= Flag.OVERRIDE
+              nFlags |= (nFlags.asInstanceOf[Long] & ((1L << 1) ^ -1L)).asInstanceOf[FlagSet] // very bad - remove case
+              Modifiers(nFlags, n, annotations)
+          }
+          val nVal = ValDef(nMods, TermName(name), tpt, rhs)
+          val (nTail, nForbidden) = prepareBlock(tail, instrumentation, remove, isUpper)
+          val nList = if (remove && instrumentation(name)) nTail else nVal :: nTail
+          (nList, nForbidden)
         case ValDef(_, TermName(name), _, Apply(Select(Ident(TermName(fName)), TermName(_)), _)) if instrumentation(fName) =>
-          val (nTail, nForbidden) = prepareBlock(tail, instrumentation + name, remove, e)
-          val list = if (remove) nTail else head :: nTail
-          (list, nForbidden)
-        case ValDef(_, TermName(name), _, _) if e.contains(name) =>
-          val (nTail, nForbidden) = prepareBlock(tail, instrumentation, remove, e)
+          val (nTail, nForbidden) = prepareBlock(tail, instrumentation + name, remove, isUpper)
           val list = if (remove) nTail else head :: nTail
           (list, nForbidden)
         case ValDef(_, TermName(name), _, _) =>
-          val (nTail, nForbidden) = prepareBlock(tail, instrumentation - name, remove, e)
+          val (nTail, nForbidden) = prepareBlock(tail, instrumentation - name, remove, isUpper)
           (head :: nTail, nForbidden)
         case Apply(Select(Ident(TermName(name)), TermName(_)), _) if instrumentation(name) =>
-          val (nTail, nForbidden) = prepareBlock(tail, instrumentation, remove, e)
+          val (nTail, nForbidden) = prepareBlock(tail, instrumentation, remove, isUpper)
           val list = if (remove) nTail else head :: nTail
           (list, nForbidden)
-        case o =>
-          val (nTail, nForbidden) = prepareBlock(tail, instrumentation, remove, e)
-          (o :: nTail, nForbidden)
+        case _ =>
+          val (nTail, nForbidden) = prepareBlock(tail, instrumentation, remove, isUpper)
+          (head :: nTail, nForbidden)
       }
 
     }
 
     def nonInstrumentedTransformer(init: Set[String] = Set(parameter)) = new Transformer {
       private var instrumentation = init
-      private var debug = false
 
       override def transform(tree: c.universe.Tree): c.universe.Tree = tree match {
-        case f@DefDef(mods, TermName("<init>"), targs, args, tpt, rhs) =>
-          println(showRaw(f))
+        case DefDef(mods, TermName("<init>"), targs, args, tpt, rhs) =>
           val nArgs = args.map(_.filterNot { case ValDef(_, TermName(name), _, _) => instrumentation(name) })
-          debug = true
-          val r = super.transform(DefDef(mods, TermName("<init>"), targs, nArgs, tpt, rhs))
-          debug = false
-          println(showRaw(r))
-          r
+          super.transform(DefDef(mods, TermName("<init>"), targs, nArgs, tpt, rhs))
         case Apply(Ident(TermName("<init>")), args) =>
           val nArgs = args.filterNot {
             case Ident(TermName(name)) => instrumentation(name)
@@ -93,14 +121,14 @@ object generateInstrumentationMacro {
           instrumentation ++= permitted
           res
         case ClassDef(mods, name, targs, Template(parents, self, body)) =>
-          val (nBody, nForbidden) = prepareBlock(body, instrumentation, remove = true)
+          val (nBody, nForbidden) = prepareBlock(body, instrumentation, remove = true, isUpper = false)
           val pForbidden = instrumentation
           instrumentation = nForbidden
           val res = super.transform(ClassDef(mods, name, targs, Template(parents, self, nBody)))
           instrumentation = pForbidden
           res
         case Block(body, tpt) =>
-          val (nBody, nForbidden) = prepareBlock(body, instrumentation, remove = true)
+          val (nBody, nForbidden) = prepareBlock(body, instrumentation, remove = true, isUpper = false)
           val pForbidden = instrumentation
           instrumentation = nForbidden
           val res = super.transform(Block(nBody, tpt))
@@ -121,6 +149,7 @@ object generateInstrumentationMacro {
             case _ => false
           }
           super.transform(Apply(fun, nArgs))
+        case Apply(TermName(name), _) if instrumentation(name) => EmptyTree
         case TermName(name) if instrumentation(name) =>
           c.abort(c.enclosingPosition, s"There is a not cut forbidden name $name.")
         case _ => super.transform(tree)
@@ -137,7 +166,7 @@ object generateInstrumentationMacro {
             case AssignOrNamedArg(_, Ident(TermName(name))) => instrumentation(name)
             case _ => false
           }
-          val nName = if (contains) cName + "$I" else cName
+          val nName = if (contains) cName + ".$I" else cName
           super.transform(Apply(Select(New(Ident(TypeName(nName))), TermName("<init>")), args))
         case f@DefDef(_, _, _, args, _, _) =>
           val names = args.flatMap(_.collect { case ValDef(_, TermName(name), _, _) => name }).toSet
@@ -146,28 +175,34 @@ object generateInstrumentationMacro {
           val res = super.transform(f)
           instrumentation ++= permitted
           res
-        case c@ClassDef(_, _, _, Template(_, _, body)) =>
-          val (_, nForbidden) = prepareBlock(body, instrumentation, remove = false)
+        case c@ClassDef(_, _, _, Template(p, _, body)) =>
+          val (_, nForbidden) = prepareBlock(body, instrumentation, remove = false, isUpper = false)
           val pForbidden = instrumentation
           instrumentation = nForbidden
           val res = super.transform(c)
           instrumentation = pForbidden
           res
         case b@Block(body, _) =>
-          val (_, nForbidden) = prepareBlock(body, instrumentation, remove = false)
+          val (_, nForbidden) = prepareBlock(body, instrumentation, remove = false, isUpper = false)
           val pForbidden = instrumentation
           instrumentation = nForbidden
           val res = super.transform(b)
           instrumentation = pForbidden
           res
-        case a@Apply(Ident(TermName(fName)), args) if a != pendingSuperCall =>
+        case a@Apply(tName, args) if a != pendingSuperCall =>
           val contains = args.exists {
             case Ident(TermName(name)) => instrumentation(name)
             case AssignOrNamedArg(_, Ident(TermName(name))) => instrumentation(name)
             case _ => false
           }
-          val nName = if (contains) fName + "$I" else fName
-          super.transform(Apply(Ident(TermName(nName)), args))
+          val nName =
+            if (contains) tName match {
+              case Ident(TermName(n)) => Ident(TermName(n + "$I"))
+              case Ident(TypeName(n)) => Select(Ident(TermName(n)), TypeName("$I"))
+              case Select(q, TermName(n)) => Select(q, TermName(n + "$I"))
+              case Select(q, TypeName(n)) => Select(Select(q, TermName(n)), TypeName("$I"))
+            } else tName
+          super.transform(Apply(nName, args))
         case _ => super.transform(tree)
       }
     }
@@ -191,19 +226,46 @@ object generateInstrumentationMacro {
         DefDef(mods, TermName(nName), types, args, tpt, nRhs)
     }
 
-    @inline def generateNonInstrumentedClass(clazz: ClassDef): ClassDef = clazz match {
-      case ClassDef(mods, name, targs, Template(parents, self, body)) =>
-        val (iBody, instrumented) = prepareBlock(body, Set(parameter), remove = true, e = Some(parameter))
-        val nBody = iBody.map(nonInstrumentedTransformer(instrumented).transform(_))
-        ClassDef(mods, name, targs, Template(parents, self, nBody))
+    @inline def generateInstrumentedClass(clazz: ClassDef, constructorArgs: Option[List[List[ValDef]]]): ClassDef = clazz match {
+      case ClassDef(mods, TypeName(name), targs, Template(parents, self, body)) =>
+        println(showRaw(parents))
+        var substitutions = Map.empty[String, String]
+        val iBody = body.map {
+          case ValDef(ms, TermName(n), tpt, rhs) if ms.hasFlag(Flag.PARAMACCESSOR) => ValDef(ms, TermName(n + "$I"), tpt, rhs)
+          case DefDef(ms, TermName(n), tyargs, args, tpt, rhs) if  =>
+//          case ValDef(ms, n, tpt, rhs) if ms.hasFlag(Flag.PRIVATE) && ms.hasFlag(Flag.MUTABLE) => EmptyTree
+//          case ValDef(ms, n, tpt, rhs) if !ms.hasFlag(Flag.PRIVATE) =>
+          case o => o
+        }
+
+        val parent = constructorArgs match {
+          case Some(args) =>
+            args.foldLeft[Tree](Ident(TypeName(name))) { (prev, as) =>
+              val idents = as.map { case ValDef(_, TermName(n), _, _) =>  Ident(TermName(n + "$I")) }
+              Apply(prev, idents)
+            }
+          case None => Ident(TypeName(name))
+        }
+        val (iiBody, instrumented) = prepareBlock(body, Set(parameter), remove = false, isUpper = true)
+        val nBody = iiBody.map(instrumentedTransformer(instrumented).transform(_))
+        ClassDef(mods, TypeName("$I"), targs, Template(List(parent), self, nBody))
     }
 
-    @inline def generateInstrumentedClass(clazz: ClassDef): ClassDef = clazz match {
+    @inline def generateNonInstrumentedClass(clazz: ClassDef, rest: List[Tree]): (ClassDef, List[Tree]) = clazz match {
       case ClassDef(mods, TypeName(name), targs, Template(parents, self, body)) =>
-        val nName = name + "$I"
-        val (_, instrumented) = prepareBlock(body, Set(parameter), remove = false, e = Some(parameter))
-        val nBody = body.map(instrumentedTransformer(instrumented).transform(_))
-        ClassDef(mods, TypeName(nName), targs, Template(parents, self, nBody))
+        val (iBody, instrumented) = prepareBlock(body, Set(parameter), remove = true, isUpper = true)
+        val nBody = iBody.map(nonInstrumentedTransformer(instrumented).transform(_))
+        val constructorArgs = nBody.collectFirst {
+          case DefDef(_, TermName("<init>"), _, args, _, cBody) if cBody.exists(_ == pendingSuperCall) => args
+        }
+        val instrumentedClass = generateInstrumentedClass(clazz, constructorArgs)
+        val compainion = rest match {
+          case ModuleDef(cMods, TermName(cName), Template(cParents, cSelf, cBody)) :: tail =>
+            val companion = ModuleDef(cMods, TermName(cName), Template(cParents, cSelf, cBody :+ instrumentedClass))
+            companion :: tail
+          case _ => q"object ${TermName(name)} { $instrumentedClass }" :: rest
+        }
+        ClassDef(mods, TypeName(name), targs, Template(parents, self, nBody)) -> compainion
     }
 
 
@@ -212,24 +274,19 @@ object generateInstrumentationMacro {
       case (func: DefDef) :: rest => // method case
         val nonIntrumented = generateNonInstrumented(func)
         val instrumented = genetateInstrumented(func)
-
-//        println(showRaw(func))
+//        println(show(func))
 //        println(showRaw(nonIntrumented))
 //        println(show(instrumented))
 //        println(showRaw(instrumented))
-        (func, nonIntrumented/* :: instrumented*/ :: rest)
+        (func, nonIntrumented :: instrumented :: rest)
       case (clazz: ClassDef) :: rest =>
-        val nonIstrumented = generateNonInstrumentedClass(clazz)
-        val instrumented = generateInstrumentedClass(clazz)
-//        println(nonIstrumented)
-//        println(instrumented)
-        (clazz, nonIstrumented /*:: instrumented*/ :: rest)
-      case (param: ValDef) :: (rest @ (_ :: _)) => (param, rest)
-      case (param: TypeDef) :: (rest @ (_ :: _)) => (param, rest)
+        val (nonIstrumented, nRest) = generateNonInstrumentedClass(clazz, rest)
+        (clazz, nonIstrumented :: nRest)
       case _ => (EmptyTree, inputs)
     }
 
-//    c.Expr[Any](expandees.head)
+    println(annottee, expandees)
+
     c.Expr[Any](Block(expandees, Literal(Constant(()))))
   }
 }
@@ -250,7 +307,7 @@ object identityMacro {
       case (param: TypeDef) :: (rest @ (_ :: _)) => (param, rest)
       case _ => (EmptyTree, inputs)
     }
-    println((annottee, expandees))
+    println((annottee, expandees.map(showRaw(_))))
     val outputs = expandees
     c.Expr[Any](Block(outputs, Literal(Constant(()))))
   }
