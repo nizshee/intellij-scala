@@ -144,7 +144,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
   private def processReferenceExpression(reference: ScReferenceExpression)(implicit editor: Editor) = {
     implicit val project: Project = editor.getProject
     val handler = new DCHandler.Resolver("", true) // TODO? uncomment
-//    ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
+    ReferenceExpressionResolver.resolve(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
 
     val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2)) // TODO receives already shaped alternatives - magic
     println(values)
@@ -160,18 +160,18 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     val s = rr.substitutor
     val subs = MethodResolveProcessor.undefinedSubstitutor(element, s, false, Seq()) // TODO maybe typeArgElements is necessary
     println(s"begining subs is $subs")
-    val c = Compatibility.compatible(element, subs, List(argExprs), false, scope, false, handler = Some(handler))
+//    val c = Compatibility.compatible(element, subs, List(argExprs), false, scope, false, handler = Some(handler))
     println(handler.args)
     val sHandler = new DCHandler.Substitutor("", true)
-    c.undefSubst.getSubstitutorWithBounds(notNonable = true, handler = Some(sHandler)) match {
-      case Some((substitutor, _, _)) =>
-        println(substitutor)
-      case None =>
-    }
-
-    c.problems.foreach { p =>
-      println(p.description)
-    }
+//    c.undefSubst.getSubstitutorWithBounds(notNonable = true, handler = Some(sHandler)) match {
+//      case Some((substitutor, _, _)) =>
+//        println(substitutor)
+//      case None =>
+//    }
+//
+//    c.problems.foreach { p =>
+//      println(p.description)
+//    }
   }
 
 

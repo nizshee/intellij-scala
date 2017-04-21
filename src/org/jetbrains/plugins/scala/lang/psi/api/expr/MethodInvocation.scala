@@ -165,7 +165,7 @@ trait MethodInvocation extends ScExpression with ScalaPsiElement {
     def checkConformance(retType: ScType, psiExprs: Seq[Expression], parameters: Seq[Parameter]) = {
       tuplizyCase(psiExprs) { t =>
         val result = Compatibility.checkConformanceExt(checkNames = true, parameters = parameters, exprs = t,
-          checkWithImplicits = true, isShapesResolve = false, handler = None)
+          checkWithImplicits = true, isShapesResolve = false)
         (retType, result.problems, result.matchedArgs, result.matchedTypes)
       }
     }

@@ -186,6 +186,7 @@ class MethodResolveProcessor(override val ref: PsiElement,
   }
 
 object MethodResolveProcessor {
+  //@uninstrumental("handler")
   private def problemsFor(c: ScalaResolveResult,
                           checkWithImplicits: Boolean,
                           ref: PsiElement,
@@ -525,6 +526,7 @@ object MethodResolveProcessor {
     }
   }
 
+  //@uninstrumental("handler")
   def candidates(proc: MethodResolveProcessor, _input: Set[ScalaResolveResult], handler: Option[DCHandler.Resolver]): Set[ScalaResolveResult] = {
     import proc._
 

@@ -23,7 +23,7 @@ import org.jetbrains.plugins.scala.lang.psi.types.api.{FunctionType, UndefinedTy
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.Parameter
 import org.jetbrains.plugins.scala.lang.psi.types.result._
 import org.jetbrains.plugins.scala.lang.refactoring.util.ScalaNamesUtil
-import org.jetbrains.plugins.scala.macroAnnotations.{CachedWithRecursionGuard, ModCount}
+import org.jetbrains.plugins.scala.macroAnnotations.{CachedWithRecursionGuard, ModCount, uninstrumental}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{Seq, Set}
@@ -128,7 +128,7 @@ object Compatibility {
                        parameters: Seq[Parameter],
                        exprs: Seq[Expression],
                        checkWithImplicits: Boolean): (Boolean, ScUndefinedSubstitutor) = {
-    val r = checkConformanceExt(checkNames, parameters, exprs, checkWithImplicits, isShapesResolve = false, handler = None)
+    val r = checkConformanceExt(checkNames, parameters, exprs, checkWithImplicits, isShapesResolve = false)
     (r.problems.isEmpty, r.undefSubst)
   }
 
@@ -166,12 +166,13 @@ object Compatibility {
     problems
   }
 
+  //@uninstrumental("handler")
   def checkConformanceExt(checkNames: Boolean,
                           parameters: Seq[Parameter],
                           exprs: Seq[Expression],
                           checkWithImplicits: Boolean,
                           isShapesResolve: Boolean,
-                          handler: Option[DCHandler.Compatibility]): ConformanceExtResult = {
+                          handler: Option[DCHandler.Compatibility] = None): ConformanceExtResult = {
     ProgressManager.checkCanceled()
     var undefSubst = ScUndefinedSubstitutor()
 
@@ -406,6 +407,7 @@ object Compatibility {
   }
 
   // TODO refactor a lot of duplication out of this method
+  //@uninstrumental("handler")
   def compatible(named: PsiNamedElement,
                  substitutor: ScSubstitutor,
                  argClauses: List[Seq[Expression]],

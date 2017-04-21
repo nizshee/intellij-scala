@@ -23,6 +23,7 @@ import org.jetbrains.plugins.scala.lang.psi.types.api.designator.ScDesignatorTyp
 import org.jetbrains.plugins.scala.lang.psi.types.api.{Any, Nothing, TypeSystem, _}
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.{Parameter, ScMethodType, ScTypePolymorphicType}
 import org.jetbrains.plugins.scala.lang.psi.types.result.TypingContext
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
 
 import scala.collection.Set
 import scala.collection.mutable.ArrayBuffer
@@ -31,6 +32,7 @@ import scala.collection.mutable.ArrayBuffer
  * User: Alexander Podkhalyuzin
  * Date: 26.04.2010
  */
+//@uninstrumental("handler")
 case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHandler.Resolver] = None)
                            (implicit typeSystem: TypeSystem) {
   def mostSpecificForResolveResult(applicable: Set[ScalaResolveResult],
@@ -315,8 +317,8 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
           if (a1 != a2 && !isMoreSpecific(a1, a2, checkImplicits)) break = true
         }
         if (!break) {
-          if (handler.isEmpty) return Some(a1)
-          else res = Some(a1)
+          /*if (handler.isEmpty) */return Some(a1) // TODO? uncomment
+          /*else res = Some(a1)*/
         }
       }
       res

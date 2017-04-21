@@ -115,7 +115,7 @@ class C(i1: Int)(i2: Int)
 // case classes
 // override methods
 
-@uninstrumental("handler")
+//@uninstrumental("handler")
 class MyClass(override val a: Int, var b: Int, handler: Option[DCHandler]) extends A(a)(b) {
 
   val puba = 1
