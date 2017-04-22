@@ -9,7 +9,6 @@ import com.intellij.openapi.project.Project
 
 
 
-// TODO? project may be implicit val
 class DCTreeStructureConformance(values: Seq[DCTreeStructureConformance.Value])(implicit project: Project) extends AbstractTreeStructure {
 
   import DCTreeStructureConformance._

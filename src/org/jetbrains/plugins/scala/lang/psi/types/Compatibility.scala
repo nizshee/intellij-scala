@@ -166,7 +166,7 @@ object Compatibility {
     problems
   }
 
-  //@uninstrumental("handler")
+  @uninstrumental("handler")
   def checkConformanceExt(checkNames: Boolean,
                           parameters: Seq[Parameter],
                           exprs: Seq[Expression],
@@ -407,7 +407,7 @@ object Compatibility {
   }
 
   // TODO refactor a lot of duplication out of this method
-  //@uninstrumental("handler")
+  @uninstrumental("handler")
   def compatible(named: PsiNamedElement,
                  substitutor: ScSubstitutor,
                  argClauses: List[Seq[Expression]],

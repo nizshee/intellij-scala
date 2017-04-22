@@ -102,7 +102,7 @@ object ReferenceExpressionResolver {
     }
   }
 
-  //@uninstrumental("handler")
+  @uninstrumental("handler")
   def resolve(reference: ScReferenceExpression, shapesOnly: Boolean, incomplete: Boolean, handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
     val name = if (reference.isUnaryOperator) "unary_" + reference.refName else reference.refName
     val info = getContextInfo(reference, reference)
@@ -130,6 +130,12 @@ object ReferenceExpressionResolver {
             while (iterator.hasNext) {
               levelSet.add(iterator.next())
             }
+            handler.foreach { h => // TODO? remove
+              val it = levelSet.iterator()
+              while (it.hasNext) h.log(it.next())
+              h.log(super.candidatesS)
+              h.log("!!!")
+            }
             super.candidatesS
           }
         }
@@ -137,16 +143,12 @@ object ReferenceExpressionResolver {
 
     var result: Array[ResolveResult] = Array.empty
     if (shapesOnly) {
-      handler.foreach { h =>
-        h.log("shape only case - skip") // TODO? why shapes only - doResolve and main case not
-      }
+      handler.foreach(_.log("shape only case - skip")) // TODO? why shapes only - doResolve and main case not
       result = doResolve(reference, processor(smartProcessor = false), handler = handler)
     } else {
       val candidatesS = processor(smartProcessor = true).candidatesS //let's try to avoid treeWalkUp
       if (candidatesS.isEmpty || candidatesS.forall(!_.isApplicable())) {
-        handler.foreach { h =>
-          h.log("strange case - skip")
-        }
+        handler.foreach(_.log("strange case - skip"))
         // it has another resolve only in one case:
         // clazz.ref(expr)
         // clazz has method ref with one argument, but it's not ok
@@ -174,7 +176,7 @@ object ReferenceExpressionResolver {
     }
   }
 
-  //@uninstrumental("handler")
+  @uninstrumental("handler")
   def doResolve(ref: ScReferenceExpression, processor: BaseProcessor, accessibilityCheck: Boolean = true,
                 handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
     implicit val manager = ref.getManager
