@@ -24,6 +24,7 @@ import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.{ScMethodType, ScType
 import org.jetbrains.plugins.scala.lang.psi.types.result.{Success, Typeable, TypingContext}
 import org.jetbrains.plugins.scala.lang.refactoring.util.ScTypeUtil.AliasType
 import org.jetbrains.plugins.scala.lang.resolve.processor.{CompoundTypeCheckSignatureProcessor, CompoundTypeCheckTypeAliasProcessor}
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
 import org.jetbrains.plugins.scala.util.ScEquivalenceUtil._
 
 import _root_.scala.collection.immutable.HashSet
@@ -34,12 +35,13 @@ import scala.collection.{Seq, immutable, mutable}
 object Conformance extends api.Conformance {
   override implicit lazy val typeSystem = ScalaTypeSystem
 
-
+  // @uninstrumental("handler")
   override protected def computable(left: ScType, right: ScType, visited: Set[PsiClass], checkWeak: Boolean, handler: Option[DCHandler.Conformance]) =
     new Computable[(Boolean, ScUndefinedSubstitutor)] {
       override def compute(): (Boolean, ScUndefinedSubstitutor) = {
         val substitutor = ScUndefinedSubstitutor()
         val leftVisitor = new LeftConformanceVisitor(left, right, visited, substitutor, checkWeak, handler = handler)
+//        new LeftConformanceVisitor.$I(left, right, visited, substitutor, checkWeak, handler = None)
 
         handler.foreach { h =>
           h.log("compute")
@@ -132,7 +134,7 @@ object Conformance extends api.Conformance {
       }
     }
 
-
+  // @uninstrumental("handler")
   private def checkParameterizedType(parametersIterator: Iterator[PsiTypeParameter], args1: scala.Seq[ScType],
                                      args2: scala.Seq[ScType], _undefinedSubst: ScUndefinedSubstitutor,
                                      visited: Set[PsiClass], checkWeak: Boolean, handler: Option[DCHandler.Conformance]): (Boolean, ScUndefinedSubstitutor) = {
@@ -256,10 +258,11 @@ object Conformance extends api.Conformance {
     (true, undefinedSubst)
   }
 
-  private class LeftConformanceVisitor(l: ScType, r: ScType, visited: Set[PsiClass],
+  // @uninstrumental("handler")
+  class LeftConformanceVisitor(l: ScType, r: ScType, visited: Set[PsiClass],
                                        subst: ScUndefinedSubstitutor,
                                        checkWeak: Boolean = false,
-                                       handler: Option[DCHandler.Conformance]) extends ScalaTypeVisitor {
+                                       handler: Option[DCHandler.Conformance] = None) extends ScalaTypeVisitor {
     private def addBounds(parameterType: TypeParameterType, `type`: ScType) = {
       val name = parameterType.nameAndId
       undefinedSubst = undefinedSubst.addLower(name, `type`, variance = 0)
@@ -2083,10 +2086,12 @@ object Conformance extends api.Conformance {
     }
   }
 
+  // @uninstrumental("handler")
   def addParam(parameterType: TypeParameterType, bound: ScType, undefinedSubst: ScUndefinedSubstitutor,
                defArgs: Seq[ScType], undefArgs: Seq[ScType], handler: Option[DCHandler.Conformance] = None): (Boolean, ScUndefinedSubstitutor) =
     addArgedBound(parameterType, bound, undefinedSubst, defArgs, undefArgs, variance = 0, addUpper = true, addLower = true, handler)
 
+  // @uninstrumental("handler")
   def addArgedBound(parameterType: TypeParameterType, bound: ScType, undefinedSubst: ScUndefinedSubstitutor,
                     defArgs: Seq[ScType], undefArgs: Seq[ScType], variance: Int = 1,
                     addUpper: Boolean = false, addLower: Boolean = false, handler: Option[DCHandler.Conformance]): (Boolean, ScUndefinedSubstitutor) = {

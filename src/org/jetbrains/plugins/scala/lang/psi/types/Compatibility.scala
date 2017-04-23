@@ -166,7 +166,7 @@ object Compatibility {
     problems
   }
 
-  @uninstrumental("handler")
+  // @uninstrumental("handler")
   def checkConformanceExt(checkNames: Boolean,
                           parameters: Seq[Parameter],
                           exprs: Seq[Expression],
@@ -229,11 +229,11 @@ object Compatibility {
           case Some(exprType) =>
             handler.foreach { h =>
               h.log(s"find constaints to $exprType >: $paramType")
-              val cHandler = h.handler
+              val cHandler = handler.map(_.handler)
               val (_, subst) = typeSystem.conformance.conformsInner(paramType, exprType,
-                substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = Some(cHandler))
+                substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = cHandler)
               h + h.Arg(param.name, exprType, paramType, subst,
-                DebugConformanceAdapter(Relation.Conformance(exprType, paramType, cHandler.conditions)).conditions) // TODO? ugly
+                DebugConformanceAdapter(Relation.Conformance(exprType, paramType, cHandler.get.conditions)).conditions)
             }
             val conforms = exprType.weakConforms(paramType) // TODO? calculates two times, i'll add third
             matched ::=(param, expr.expr)
@@ -407,7 +407,7 @@ object Compatibility {
   }
 
   // TODO refactor a lot of duplication out of this method
-  @uninstrumental("handler")
+  // @uninstrumental("handler")
   def compatible(named: PsiNamedElement,
                  substitutor: ScSubstitutor,
                  argClauses: List[Seq[Expression]],

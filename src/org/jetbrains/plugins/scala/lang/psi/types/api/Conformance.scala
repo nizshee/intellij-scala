@@ -9,6 +9,7 @@ import com.intellij.util.containers.ContainerUtil
 import org.jetbrains.plugins.scala.actions.{ConformanceCondition, DCHandler, DebugConformanceAction}
 import org.jetbrains.plugins.scala.caches.RecursionManager
 import org.jetbrains.plugins.scala.lang.psi.types._
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
 
 
 
@@ -28,6 +29,7 @@ trait Conformance extends TypeSystemOwner {
     * Checks, whether the following assignment is correct:
     * val x: l = (y: r)
     */
+  // @uninstrumental("handler")
   final def conformsInner(left: ScType, right: ScType, // TODO?
                           visited: Set[PsiClass] = Set.empty,
                           substitutor: ScUndefinedSubstitutor = ScUndefinedSubstitutor(),
@@ -56,15 +58,14 @@ trait Conformance extends TypeSystemOwner {
     val res = guard.doPreventingRecursion(key, computable(left, right, visited, checkWeak, handler))
     if (res == null) return (false, ScUndefinedSubstitutor())
     cache.put(key, res)
-//    if (!substitutor.isEmpty) {
-//      println(left, right)
-//    }
+
     if (substitutor.isEmpty) return res
     res.copy(_2 = substitutor + res._2)
   }
 
   final def clearCache(): Unit = cache.clear()
 
+  // @uninstrumental("handler")
   protected def computable(left: ScType, right: ScType,
                            visited: Set[PsiClass],
                            checkWeak: Boolean, handler: Option[DCHandler.Conformance]): Computable[(Boolean, ScUndefinedSubstitutor)]

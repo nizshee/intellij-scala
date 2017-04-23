@@ -1,7 +1,7 @@
 import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.macroAnnotations.{identity, uninstrumental}
 
-@uninstrumental("handler")
+// @uninstrumental("handler")
 case class A(a: Int, var b: Int, handler: Option[DCHandler] = None)(implicit c: Int) {
   def i: Int = {
     handler.foreach(_.log("method"))
@@ -11,6 +11,15 @@ case class A(a: Int, var b: Int, handler: Option[DCHandler] = None)(implicit c: 
     handler.foreach(_.log("premethod"))
     a + b
   }
+}
+
+class AB {
+  def a: Int = 1
+}
+
+@identity
+class BD extends AB {
+  override def a = super.a
 }
 
 @identity

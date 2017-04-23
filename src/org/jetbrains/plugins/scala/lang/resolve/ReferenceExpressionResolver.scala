@@ -102,7 +102,7 @@ object ReferenceExpressionResolver {
     }
   }
 
-  @uninstrumental("handler")
+  // @uninstrumental("handler")
   def resolve(reference: ScReferenceExpression, shapesOnly: Boolean, incomplete: Boolean, handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
     val name = if (reference.isUnaryOperator) "unary_" + reference.refName else reference.refName
     val info = getContextInfo(reference, reference)
@@ -176,7 +176,7 @@ object ReferenceExpressionResolver {
     }
   }
 
-  @uninstrumental("handler")
+  // @uninstrumental("handler")
   def doResolve(ref: ScReferenceExpression, processor: BaseProcessor, accessibilityCheck: Boolean = true,
                 handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
     implicit val manager = ref.getManager

@@ -144,7 +144,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
   private def processReferenceExpression(reference: ScReferenceExpression)(implicit editor: Editor) = {
     implicit val project: Project = editor.getProject
     val handler = new DCHandler.Resolver("", true) // TODO? uncomment
-    ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
+//    ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
 
     val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2)) // TODO receives already shaped alternatives - magic
     println(values)
@@ -189,7 +189,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
             handler.log("Action fired on:")
             handler.logtn(left, right)
             val inner = handler.inner
-            val (canConform, subst) = Conformance.conformsInner(left, right, handler = Some(inner))
+            val (canConform, subst) = Conformance.conformsInner(left, right/*, handler = Some(inner)*/)
             val conformance = Relation.Conformance(left, right, inner.conditions)
             val values = Seq(DCTreeStructureConformance.Value(if (true) DebugConformanceAdapter(conformance) else conformance))
             showPopup(new DCTreeStructureConformance(values))

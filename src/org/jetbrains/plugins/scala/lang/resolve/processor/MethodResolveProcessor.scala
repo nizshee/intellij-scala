@@ -30,7 +30,7 @@ import scala.collection.Set
 import scala.collection.mutable.ArrayBuffer
 
 //todo: remove all argumentClauses, we need just one of them
-@uninstrumental("handler")
+// @uninstrumental("handler") //
 class MethodResolveProcessor(override val ref: PsiElement,
                              val refName: String,
                              var argumentClauses: List[Seq[Expression]],
@@ -146,7 +146,7 @@ class MethodResolveProcessor(override val ref: PsiElement,
       collectCandidates(super.candidatesS.map(_.copy(isDynamic = true))).filter(_.isApplicable())
     } else {
       handler.foreach(_.log(s"not dynamic -- super.candidates contains ${super.candidatesS}; instrument collectCandidates"))
-      collectCandidates(super.candidatesS)
+      collectCandidates(super.candidatesS) // TODO? normal super
     }
   }
 
@@ -186,7 +186,7 @@ class MethodResolveProcessor(override val ref: PsiElement,
   }
 
 object MethodResolveProcessor {
-  @uninstrumental("handler")
+  // @uninstrumental("handler")
   private def problemsFor(c: ScalaResolveResult,
                           checkWithImplicits: Boolean,
                           ref: PsiElement,
@@ -526,7 +526,7 @@ object MethodResolveProcessor {
     }
   }
 
-  @uninstrumental("handler")
+  // @uninstrumental("handler")
   def candidates(proc: MethodResolveProcessor, _input: Set[ScalaResolveResult], handler: Option[DCHandler.Resolver]): Set[ScalaResolveResult] = {
     import proc._
 

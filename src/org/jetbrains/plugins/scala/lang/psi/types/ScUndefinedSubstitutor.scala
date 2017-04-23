@@ -14,7 +14,7 @@ sealed trait ScUndefinedSubstitutor {
   def addLower(name: Name, _lower: ScType, additional: Boolean = false, variance: Int = -1): ScUndefinedSubstitutor
   def addUpper(name: Name, _upper: ScType, additional: Boolean = false, variance: Int = 1): ScUndefinedSubstitutor
 
-  @uninstrumental("handler")
+  // @uninstrumental("handler")
   def getSubstitutor(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[ScSubstitutor] =
     getSubstitutorWithBounds(notNonable, handler = handler).map(_._1)
   def getSubstitutor: Option[ScSubstitutor] = getSubstitutor(notNonable = false)
@@ -25,7 +25,7 @@ sealed trait ScUndefinedSubstitutor {
   def names: Set[Name]
 
   //subst, lowers, uppers
-  @uninstrumental("handler")
+  // @uninstrumental("handler")
   def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])]
 }
 
@@ -185,7 +185,7 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
     upperMap.keySet ++ lowerMap.filter(_._2.exists(!_.equiv(Nothing))).keySet ++ additionalNames
   }
 
-  @uninstrumental("handler")
+  // @uninstrumental("handler")
   def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] = {
     var tvMap = Map.empty[Name, ScType]
     var lMap = Map.empty[Name, ScType]
@@ -385,7 +385,6 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
           } else {
             handler.foreach(_.addType(tvMap(name)))
             handler.foreach(_.logn(s"took ${tvMap(name)}"))
-            () // TODO? bug in uninstrumental
           }
           tvMap.get(name)
       }
@@ -421,7 +420,7 @@ class ScMultiUndefinedSubstitutor(val subs: Seq[ScUndefinedSubstitutor]) extends
   override def addUpper(name: (String, Long), _upper: ScType, additional: Boolean, variance: Int): ScUndefinedSubstitutor =
     copy(subs.map(_.addUpper(name, _upper, additional, variance)))
 
-  @uninstrumental("handler")
+  // @uninstrumental("handler")
   override def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] =
     subs.map(_.getSubstitutorWithBounds(notNonable)).find(_.isDefined).getOrElse(None)
 
