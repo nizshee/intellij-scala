@@ -341,7 +341,7 @@ object generateInstrumentationMacro {
         }
 
         val nBody = iiBody.map(instrumentedTransformer(instrumented).transform(_))
-        ClassDef(mods.removeFlag(Flag.CASE), TypeName("$I"), targs, Template(List(parent), self, nBody))
+        ClassDef(mods.removeFlag(Flag.CASE | Flag.PRIVATE | Flag.PROTECTED), TypeName("$I"), targs, Template(List(parent), self, nBody))
     }
 
     @inline def generateNonInstrumentedClass(clazz: ClassDef, rest: List[Tree]): (ClassDef, List[Tree]) = clazz match {
@@ -375,7 +375,8 @@ object generateInstrumentationMacro {
           }
         }
         val methods = superMethods(clazz)
-        ClassDef(mods, TypeName(name), targs, Template(parents, self, nBody ++ methods)) -> compainion
+        val nMods = if (mods.hasFlag(Flag.PRIVATE)) mods.removeFlag(Flag.PRIVATE).addFlag(Flag.PROTECTED) else mods
+        ClassDef(nMods, TypeName(name), targs, Template(parents, self, nBody ++ methods)) -> compainion
     }
 
 

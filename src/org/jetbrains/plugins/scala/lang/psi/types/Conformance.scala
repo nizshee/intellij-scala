@@ -35,7 +35,7 @@ import scala.collection.{Seq, immutable, mutable}
 object Conformance extends api.Conformance {
   override implicit lazy val typeSystem = ScalaTypeSystem
 
-  // @uninstrumental("handler")
+  @uninstrumental("handler")
   override protected def computable(left: ScType, right: ScType, visited: Set[PsiClass], checkWeak: Boolean, handler: Option[DCHandler.Conformance]) =
     new Computable[(Boolean, ScUndefinedSubstitutor)] {
       override def compute(): (Boolean, ScUndefinedSubstitutor) = {
@@ -134,7 +134,7 @@ object Conformance extends api.Conformance {
       }
     }
 
-  // @uninstrumental("handler")
+  @uninstrumental("handler")
   private def checkParameterizedType(parametersIterator: Iterator[PsiTypeParameter], args1: scala.Seq[ScType],
                                      args2: scala.Seq[ScType], _undefinedSubst: ScUndefinedSubstitutor,
                                      visited: Set[PsiClass], checkWeak: Boolean, handler: Option[DCHandler.Conformance]): (Boolean, ScUndefinedSubstitutor) = {
@@ -258,8 +258,8 @@ object Conformance extends api.Conformance {
     (true, undefinedSubst)
   }
 
-  // @uninstrumental("handler")
-  class LeftConformanceVisitor(l: ScType, r: ScType, visited: Set[PsiClass],
+  @uninstrumental("handler")
+  private class LeftConformanceVisitor(l: ScType, r: ScType, visited: Set[PsiClass],
                                        subst: ScUndefinedSubstitutor,
                                        checkWeak: Boolean = false,
                                        handler: Option[DCHandler.Conformance] = None) extends ScalaTypeVisitor {
@@ -2086,12 +2086,12 @@ object Conformance extends api.Conformance {
     }
   }
 
-  // @uninstrumental("handler")
+  @uninstrumental("handler")
   def addParam(parameterType: TypeParameterType, bound: ScType, undefinedSubst: ScUndefinedSubstitutor,
                defArgs: Seq[ScType], undefArgs: Seq[ScType], handler: Option[DCHandler.Conformance] = None): (Boolean, ScUndefinedSubstitutor) =
     addArgedBound(parameterType, bound, undefinedSubst, defArgs, undefArgs, variance = 0, addUpper = true, addLower = true, handler)
 
-  // @uninstrumental("handler")
+  @uninstrumental("handler")
   def addArgedBound(parameterType: TypeParameterType, bound: ScType, undefinedSubst: ScUndefinedSubstitutor,
                     defArgs: Seq[ScType], undefArgs: Seq[ScType], variance: Int = 1,
                     addUpper: Boolean = false, addLower: Boolean = false, handler: Option[DCHandler.Conformance]): (Boolean, ScUndefinedSubstitutor) = {

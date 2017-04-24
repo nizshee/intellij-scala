@@ -29,7 +29,7 @@ trait Conformance extends TypeSystemOwner {
     * Checks, whether the following assignment is correct:
     * val x: l = (y: r)
     */
-  // @uninstrumental("handler")
+  @uninstrumental("handler")
   final def conformsInner(left: ScType, right: ScType, // TODO?
                           visited: Set[PsiClass] = Set.empty,
                           substitutor: ScUndefinedSubstitutor = ScUndefinedSubstitutor(),
@@ -65,7 +65,7 @@ trait Conformance extends TypeSystemOwner {
 
   final def clearCache(): Unit = cache.clear()
 
-  // @uninstrumental("handler")
+  @uninstrumental("handler")
   protected def computable(left: ScType, right: ScType,
                            visited: Set[PsiClass],
                            checkWeak: Boolean, handler: Option[DCHandler.Conformance]): Computable[(Boolean, ScUndefinedSubstitutor)]

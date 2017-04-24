@@ -2,6 +2,9 @@ package org.jetbrains.plugins.scala
 package lang
 package resolve
 
+import java.io.FileWriter
+import java.nio.file.{Files, Paths}
+
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi._
 import com.intellij.psi.util.PsiTreeUtil
@@ -102,8 +105,9 @@ object ReferenceExpressionResolver {
     }
   }
 
-  // @uninstrumental("handler")
+  @uninstrumental("handler")
   def resolve(reference: ScReferenceExpression, shapesOnly: Boolean, incomplete: Boolean, handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
+    val start = System.nanoTime()
     val name = if (reference.isUnaryOperator) "unary_" + reference.refName else reference.refName
     val info = getContextInfo(reference, reference)
 
@@ -160,13 +164,9 @@ object ReferenceExpressionResolver {
         result = candidatesS.toArray
       }
     }
-    handler.foreach { h =>
-      h.log(s"processor returned result ${result.toList.map(_.getElement.getNode.getText)}")
-    }
-    if (result.isEmpty && reference.isAssignmentOperator) {
-      handler.foreach { h =>
-        h.log("empty result + assignment operator - skip")
-      }
+    handler.foreach(_.log(s"processor returned result ${result.toList.map(_.getElement.getNode.getText)}"))
+    val r = if (result.isEmpty && reference.isAssignmentOperator) {
+      handler.foreach(_.log("empty result + assignment operator - skip"))
       val assignProcessor = new MethodResolveProcessor(reference, reference.refName.init, List(argumentsOf(reference)),
         Nil, prevInfoTypeParams, isShapeResolve = shapesOnly, enableTupling = true)
       result = doResolve(reference, assignProcessor, handler = handler)
@@ -174,9 +174,16 @@ object ReferenceExpressionResolver {
     } else {
       result // TODO? no doResolve in main path?
     }
+    val end = System.nanoTime()
+    val fw = new FileWriter("res", true)
+    try {
+      fw.write((end - start).toString + "\n")
+    }
+    finally fw.close()
+    r
   }
 
-  // @uninstrumental("handler")
+  @uninstrumental("handler")
   def doResolve(ref: ScReferenceExpression, processor: BaseProcessor, accessibilityCheck: Boolean = true,
                 handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
     implicit val manager = ref.getManager

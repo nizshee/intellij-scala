@@ -1,7 +1,7 @@
 import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.macroAnnotations.{identity, uninstrumental}
 
-// @uninstrumental("handler")
+@uninstrumental("handler")
 case class A(a: Int, var b: Int, handler: Option[DCHandler] = None)(implicit c: Int) {
   def i: Int = {
     handler.foreach(_.log("method"))

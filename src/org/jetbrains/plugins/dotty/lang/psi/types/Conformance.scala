@@ -12,7 +12,7 @@ import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
 object Conformance extends api.Conformance {
   override implicit lazy val typeSystem = DottyTypeSystem
 
-  // @uninstrumental("handler")
+  @uninstrumental("handler")
   override protected def computable(left: ScType, right: ScType, visited: Set[PsiClass], checkWeak: Boolean,
                                     handler: Option[DCHandler.Conformance]) = new Computable[(Boolean, ScUndefinedSubstitutor)] {
     override def compute(): (Boolean, ScUndefinedSubstitutor) = (false, ScUndefinedSubstitutor())

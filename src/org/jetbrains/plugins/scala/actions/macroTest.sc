@@ -22,7 +22,7 @@ class D2(var b$: Int) extends D1(1) {
   b = b + 1
 }*/
 
-// // @uninstrumental("handler")
+// @uninstrumental("handler")
 def myMethod(handler: Option[DCHandler] = None): Int = {
 
   if (a.boolean && a.boolean1 && handler.isEmpty) {
@@ -69,7 +69,7 @@ def myMethod(handler: Option[DCHandler] = None): Int = {
 }
 
 
-// // @uninstrumental("handler")
+// @uninstrumental("handler")
 //def myInnerMethod(i: Int, handler: Option[DCHandler] = None): Int = {
 //  handler.foreach(_.log("!!!"))
 //  new MyClass(i, handler)
@@ -115,7 +115,7 @@ class C(i1: Int)(i2: Int)
 // case classes
 // override methods
 
-// // @uninstrumental("handler")
+// @uninstrumental("handler")
 class MyClass(override val a: Int, var b: Int, handler: Option[DCHandler]) extends A(a)(b) {
 
   val puba = 1
@@ -133,7 +133,7 @@ class MyClass(override val a: Int, var b: Int, handler: Option[DCHandler]) exten
 }
 
 object MyClass {
-//  // @uninstrumental("handler")
+//  @uninstrumental("handler")
   def method(c: MyClass, handler: Option[DCHandler]): Unit = {
     handler.foreach(_.log("companion"))
 
