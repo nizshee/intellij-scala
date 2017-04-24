@@ -29,9 +29,9 @@ import scala.collection.Set
 import scala.collection.mutable.ArrayBuffer
 
 /**
- * User: Alexander Podkhalyuzin
- * Date: 26.04.2010
- */
+  * User: Alexander Podkhalyuzin
+  * Date: 26.04.2010
+  */
 @uninstrumental("handler")
 case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHandler.Resolver] = None)
                            (implicit typeSystem: TypeSystem) {
@@ -47,10 +47,11 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
   }
 
   def mostSpecificForImplicitParameters(applicable: Set[(ScalaResolveResult, ScSubstitutor)]): Option[ScalaResolveResult] = {
-    mostSpecificGeneric(applicable.map{case (r, subst) => r.innerResolveResult match {
+    mostSpecificGeneric(applicable.map { case (r, subst) => r.innerResolveResult match {
       case Some(rr) => new InnerScalaResolveResult(rr.element, rr.implicitConversionClass, r, subst, implicitCase = true)
       case None => new InnerScalaResolveResult(r.element, r.implicitConversionClass, r, subst, implicitCase = true)
-    }}, noImplicit = true).map(_.repr)
+    }
+    }, noImplicit = true).map(_.repr)
   }
 
   def nextLayerSpecificForImplicitParameters(filterRest: Option[ScalaResolveResult],
@@ -85,11 +86,13 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
   def mostSpecificForImplicit(applicable: Set[ImplicitResolveResult]): Option[ImplicitResolveResult] = {
     mostSpecificGeneric(applicable.map(r => {
       var callByName = false
+
       def checkCallByName(clauses: Seq[ScParameterClause]): Unit = {
         if (clauses.nonEmpty && clauses.head.parameters.length == 1 && clauses.head.parameters.head.isCallByNameParameter) {
           callByName = true
         }
       }
+
       r.element match {
         case f: ScFunction => checkCallByName(f.paramClauses.clauses)
         case f: ScPrimaryConstructor => checkCallByName(f.effectiveParameterClauses)
@@ -111,9 +114,11 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
       if (lastOption.isEmpty) return false
       lastOption.get.isRepeated
     }
+
     (r1.element, r2.element) match {
       case (m1@(_: PsiMethod | _: ScFun), m2@(_: PsiMethod | _: ScFun)) =>
         val (t1, t2) = (r1.substitutor.subst(getType(m1, r1.implicitCase)), r2.substitutor.subst(getType(m2, r2.implicitCase)))
+
         def calcParams(tp: ScType, existential: Boolean): Either[Seq[Parameter], ScType] = {
           tp match {
             case ScMethodType(_, params, _) => Left(params)
@@ -158,43 +163,49 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
         }
 
         val conformance = (calcParams(t1, existential = true), calcParams(t2, existential = false)) match {
-            case (Left(p1), Left(p2)) =>
-              var (params1, params2) = (p1, p2)
-              if ((t1.isInstanceOf[ScTypePolymorphicType] && t2.isInstanceOf[ScTypePolymorphicType] ||
-                      (!(m1.isInstanceOf[ScFunction] || m1.isInstanceOf[ScFun] || m1.isInstanceOf[ScPrimaryConstructor]) ||
-                              !(m2.isInstanceOf[ScFunction] || m2.isInstanceOf[ScFun] || m2.isInstanceOf[ScPrimaryConstructor]))) &&
-                      (lastRepeated(params1) ^ lastRepeated(params2))) return lastRepeated(params2) //todo: this is hack!!! see SCL-3846, SCL-4048
-              if (lastRepeated(params1) && !lastRepeated(params2)) params1 = params1.map {
-                case p: Parameter if p.isRepeated =>
-                  val seq = ScalaPsiManager.instance(r1.element.getProject).getCachedClass(r1.element.getResolveScope,
-                    "scala.collection.Seq").orNull
-                  if (seq != null) {
-                    val newParamType = p.paramType match {
-                      case ScExistentialType(q, wilds) =>
-                        ScExistentialType(ScParameterizedType(ScDesignatorType(seq), Seq(q)), wilds)
-                      case paramType => ScParameterizedType(ScDesignatorType(seq), Seq(paramType))
-                    }
-                    Parameter(p.name, p.deprecatedName, newParamType, p.expectedType,
-                      p.isDefault, isRepeated = false, isByName = p.isByName)
+          case (Left(p1), Left(p2)) =>
+            var (params1, params2) = (p1, p2)
+            if ((t1.isInstanceOf[ScTypePolymorphicType] && t2.isInstanceOf[ScTypePolymorphicType] ||
+              (!(m1.isInstanceOf[ScFunction] || m1.isInstanceOf[ScFun] || m1.isInstanceOf[ScPrimaryConstructor]) ||
+                !(m2.isInstanceOf[ScFunction] || m2.isInstanceOf[ScFun] || m2.isInstanceOf[ScPrimaryConstructor]))) &&
+              (lastRepeated(params1) ^ lastRepeated(params2))) {
+              handler.foreach(_.addWeight(r1.element, r2.element, AsSpecificAsCondition.Explanation("see SCL-3846, SCL-4048", lastRepeated(params2))))
+              return lastRepeated(params2) //todo: this is hack!!! see SCL-3846, SCL-4048
+            }
+            if (lastRepeated(params1) && !lastRepeated(params2)) params1 = params1.map {
+              case p: Parameter if p.isRepeated =>
+                val seq = ScalaPsiManager.instance(r1.element.getProject).getCachedClass(r1.element.getResolveScope,
+                  "scala.collection.Seq").orNull
+                if (seq != null) {
+                  val newParamType = p.paramType match {
+                    case ScExistentialType(q, wilds) =>
+                      ScExistentialType(ScParameterizedType(ScDesignatorType(seq), Seq(q)), wilds)
+                    case paramType => ScParameterizedType(ScDesignatorType(seq), Seq(paramType))
                   }
-                  else p
-                case p => p
-              }
-              val i: Int = if (params1.nonEmpty) 0.max(length - params1.length) else 0
-              val default: Expression =
-                new Expression(if (params1.nonEmpty) params1.last.paramType else Nothing, elem)
-              val exprs: Seq[Expression] = params1.map(p => new Expression(p.paramType, elem)) ++
-                      Seq.fill(i)(default)
-              Compatibility.checkConformance(checkNames = false, params2, exprs, checkImplicits)
-            case (Right(type1), Right(type2)) =>
-              type1.conforms(type2, ScUndefinedSubstitutor()) //todo: with implcits?
-            //todo this is possible, when one variant is empty with implicit parameters, and second without parameters.
-            //in this case it's logical that method without parameters must win...
-            case (Left(_), Right(_)) if !r1.implicitCase => return false
-            case _ =>
-//              handler.foreach(_.addWeight(r1.element, r2.element, AsSpecificAsCondition.Other(t1, t2, satisfy = true)))
-              return true
-          }
+                  Parameter(p.name, p.deprecatedName, newParamType, p.expectedType,
+                    p.isDefault, isRepeated = false, isByName = p.isByName)
+                }
+                else p
+              case p => p
+            }
+            val i: Int = if (params1.nonEmpty) 0.max(length - params1.length) else 0
+            val default: Expression =
+              new Expression(if (params1.nonEmpty) params1.last.paramType else Nothing, elem)
+            val exprs: Seq[Expression] = params1.map(p => new Expression(p.paramType, elem)) ++
+              Seq.fill(i)(default)
+            Compatibility.checkConformance(checkNames = false, params2, exprs, checkImplicits)
+          case (Right(type1), Right(type2)) =>
+            type1.conforms(type2, ScUndefinedSubstitutor()) //todo: with implcits?
+          //todo this is possible, when one variant is empty with implicit parameters, and second without parameters.
+          //in this case it's logical that method without parameters must win...
+          case (Left(_), Right(_)) if !r1.implicitCase =>
+            handler.foreach(_.addWeight(r1.element, r2.element, AsSpecificAsCondition.Explanation(
+              "in this case it's logical that method without parameters must win...", !r1.implicitCase)))
+            return false
+          case _ =>
+            handler.foreach(_.addWeight(r1.element, r2.element, AsSpecificAsCondition.Other(true)))
+            return true
+        }
 
         var u = conformance._2
         if (!conformance._1) return false
@@ -217,6 +228,7 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
                   }
                   hasRecursiveTypeParameters
                 }
+
                 typeParams.foreach(tp => {
                   if (tp.lowerType.v != Nothing) {
                     val substedLower = uSubst.subst(tp.lowerType.v)
@@ -236,12 +248,15 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
           case _ =>
         }
         val isDefined = u.getSubstitutor.isDefined
-        handler.foreach(_.addWeight(r1.element, r2.element, AsSpecificAsCondition.Method(t1, t2, satisfy = true)))
+        handler.foreach(_.addWeight(r1.element, r2.element, AsSpecificAsCondition.Method(t1, t2, satisfy = isDefined)))
         isDefined
-      case (_, _: PsiMethod) => true
+      case (_, _: PsiMethod) =>
+        handler.foreach(_.addWeight(r1.element, r2.element, AsSpecificAsCondition.Explanation("psi methods", satisfy = true)))
+        true
       case (e1, e2) =>
         val t1: ScType = getType(e1, r1.implicitCase)
         val t2: ScType = getType(e2, r2.implicitCase)
+        handler.foreach(_.addWeight(r1.element, r2.element, AsSpecificAsCondition.Conforms(t1, t2, t1.conforms(t2))))
         t1.conforms(t2)
     }
   }
@@ -255,12 +270,12 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
   }
 
   /**
-   * c1 is a subclass of c2, or
-   * c1 is a companion object of a class derived from c2, or
-   * c2 is a companion object of a class from which c1 is derived.
+    * c1 is a subclass of c2, or
+    * c1 is a companion object of a class derived from c2, or
+    * c2 is a companion object of a class from which c1 is derived.
     *
     * @return true is c1 is derived from c2, false if c1 or c2 is None
-   */
+    */
   def isDerived(c1: Option[PsiClass], c2: Option[PsiClass]): Boolean = {
     (c1, c2) match {
       case (Some(clazz1), Some(clazz2)) =>
@@ -312,17 +327,19 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
         val a1 = a1iterator.next()
         var break = false
         val a2iterator = applicable.iterator
-        while (a2iterator.hasNext && (!break || handler.nonEmpty)) { // TODO? all weights
+        while (a2iterator.hasNext && (!break || handler.nonEmpty)) {
+          // TODO? all weights
           val a2 = a2iterator.next()
           if (a1 != a2 && !isMoreSpecific(a1, a2, checkImplicits)) break = true
         }
         if (!break) {
-          /*if (handler.isEmpty) */return Some(a1) // TODO? uncomment
+          /*if (handler.isEmpty) */ return Some(a1) // TODO? uncomment
           /*else res = Some(a1)*/
         }
       }
       res
     }
+
     val result = calc(checkImplicits = false)
     if (!noImplicit && result.isEmpty) calc(checkImplicits = true)
     else result

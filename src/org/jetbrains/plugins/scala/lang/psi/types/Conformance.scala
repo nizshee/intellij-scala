@@ -41,7 +41,6 @@ object Conformance extends api.Conformance {
       override def compute(): (Boolean, ScUndefinedSubstitutor) = {
         val substitutor = ScUndefinedSubstitutor()
         val leftVisitor = new LeftConformanceVisitor(left, right, visited, substitutor, checkWeak, handler = handler)
-//        new LeftConformanceVisitor.$I(left, right, visited, substitutor, checkWeak, handler = None)
 
         handler.foreach { h =>
           h.log("compute")

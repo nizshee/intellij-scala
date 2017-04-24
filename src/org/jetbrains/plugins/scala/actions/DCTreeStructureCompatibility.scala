@@ -6,7 +6,7 @@ import com.intellij.ide.projectView.PresentationData
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
-import org.jetbrains.plugins.scala.actions.AsSpecificAsCondition.{Method, Other, Polymorphic}
+import org.jetbrains.plugins.scala.actions.AsSpecificAsCondition._
 import org.jetbrains.plugins.scala.actions.DCTreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue}
 import org.jetbrains.plugins.scala.lang.psi.types.api.UndefinedType
 import org.jetbrains.plugins.scala.lang.psi.types.{ScUndefinedSubstitutor, ScalaTypeSystem}
@@ -47,12 +47,15 @@ object DCTreeStructureCompatibility {
 
     override def update(presentationData: PresentationData): Unit = {
       val text = value.asSpecificAsCondition match {
-        case Method(left, right, satisfy) =>
+        case Method(left, right, _) =>
           s"method $left as specific as $right"
-        case Polymorphic(satisfy) =>
-          "something"
-        case Other(left, right, satisfy) =>
-          s"not polymorphic or method $left as specific as $right"
+        case Polymorphic(_) =>
+          "todo"
+        case Other(satisfy) =>
+          s"not polymorphic or method always as specific as polymorphic or method"
+        case Explanation(txt, _) => txt
+        case Conforms(left, right, _) =>
+          s"if not method type then conformance"
       }
       presentationData.setPresentableText(text)
     }

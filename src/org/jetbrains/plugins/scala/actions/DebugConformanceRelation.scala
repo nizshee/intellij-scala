@@ -104,5 +104,7 @@ sealed trait AsSpecificAsCondition {
 object AsSpecificAsCondition {
   case class Method(left: ScType, right: ScType, satisfy: Boolean) extends AsSpecificAsCondition
   case class Polymorphic(satisfy: Boolean) extends AsSpecificAsCondition
-  case class Other(left: ScType, right: ScType, satisfy: Boolean) extends AsSpecificAsCondition
+  case class Other(satisfy: Boolean) extends AsSpecificAsCondition
+  case class Conforms(left: ScType, right: ScType, satisfy: Boolean) extends AsSpecificAsCondition
+  case class Explanation(text: String, satisfy: Boolean) extends AsSpecificAsCondition
 }
