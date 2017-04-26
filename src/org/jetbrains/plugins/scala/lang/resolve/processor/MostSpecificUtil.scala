@@ -32,7 +32,7 @@ import scala.collection.mutable.ArrayBuffer
   * User: Alexander Podkhalyuzin
   * Date: 26.04.2010
   */
-@uninstrumental("handler")
+@uninstrumental("handler", debug = true)
 case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHandler.Resolver] = None)
                            (implicit typeSystem: TypeSystem) {
   def mostSpecificForResolveResult(applicable: Set[ScalaResolveResult],
@@ -354,8 +354,8 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
           if (a1 != a2 && !isMoreSpecific(a1, a2, checkImplicits)) break = true
         }
         if (!break) {
-          /*if (handler.isEmpty) */ return Some(a1) // TODO?! uncomment
-          /*else res = Some(a1)*/
+          if (handler.isEmpty) return Some(a1)
+          else res = Some(a1)
         }
       }
       res

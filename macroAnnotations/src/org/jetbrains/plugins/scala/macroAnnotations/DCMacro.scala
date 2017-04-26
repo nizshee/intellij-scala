@@ -204,6 +204,8 @@ object generateInstrumentationMacro {
             case _ => false
           }
           super.transform(Apply(fun, nArgs))
+        case If(Select(Ident(TermName(name)), TermName("isEmpty")), tr, _) if instrumentation(name) => transform(tr)
+        case If(Select(Ident(TermName(name)), TermName("nonEmpty")), _, tr) if instrumentation(name) => transform(tr)
         case TermName(name) if instrumentation(name) =>
           c.abort(c.enclosingPosition, s"There is a not cut forbidden name $name.")
         case _ => super.transform(tree)
@@ -403,8 +405,8 @@ object generateInstrumentationMacro {
     }
 
     if (debug) {
-      println(annottee)
-      expandees.foreach(println)
+//      println(annottee)
+//      expandees.foreach(println)
     }
 
     c.Expr[Any](Block(expandees, Literal(Constant(()))))

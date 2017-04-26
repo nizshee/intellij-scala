@@ -14,6 +14,6 @@ class C(handler: Option[Int]) {
 
 @identity
 class D {
-  var a = 1
-  a = 2
+  if (true) 1
+  if (false) 1 else 2
 }
