@@ -287,7 +287,6 @@ object generateInstrumentationMacro {
           } else args
           super.transform(Apply(nName, nArgs))
         case Select(Super(This(TypeName("")), TypeName("")), TermName(method)) if _clazz.exists(_.endsWith("$I")) =>
-          println(currentClass.fullName)
           Ident(TermName(method + "$IS"))
         case _ => super.transform(tree)
       }

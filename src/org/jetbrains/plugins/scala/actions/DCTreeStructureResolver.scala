@@ -2,14 +2,21 @@ package org.jetbrains.plugins.scala.actions
 
 import java.util
 
-import com.intellij.ide.projectView.PresentationData
+import com.intellij.ide.projectView.{PresentationData, ViewSettings}
+import com.intellij.ide.projectView.impl.nodes.AbstractPsiBasedNode
 import com.intellij.ide.util.treeView.{AbstractTreeNode, AbstractTreeStructure, NodeDescriptor}
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
-import com.intellij.psi.PsiNamedElement
+import com.intellij.psi.util.PsiTreeUtil
+import com.intellij.psi.{PsiElement, PsiField, PsiMethod, PsiNamedElement}
 import org.jetbrains.plugins.scala.actions.DCTreeStructureCompatibility.{CompatibilityNode, CompatibilityValue, MostSpecificNode, MostSpecificValue}
 import org.jetbrains.plugins.scala.actions.DCTreeStructureConformance.{ConditionNode, RelationNode}
 import org.jetbrains.plugins.scala.actions.DCTreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue, TypeVariableNode}
+import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
+import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.ScReferencePattern
+import org.jetbrains.plugins.scala.lang.psi.api.statements.{ScFun, ScFunction, ScPatternDefinition, ScVariableDefinition}
+import org.jetbrains.plugins.scala.lang.psi.api.toplevel.ScTypedDefinition
+import org.jetbrains.plugins.scala.lang.psi.types.api.Nothing
 
 /**
   * Created by user on 4/10/17.
@@ -75,7 +82,31 @@ class DCTreeStructureResolver(values: Seq[DCTreeStructureResolver.Value])(implic
 
 object DCTreeStructureResolver {
 //  @inline private def el2String(el: PsiNamedElement): String = MostSpecificUtil(el, 0)(ScalaTypeSystem).getType(el, implicitCase = false).toString
-  @inline private def el2String(el: PsiNamedElement): String = el.getNode.getText
+//  @inline private def el2String(el: PsiNamedElement): String = el.getNode.getText
+
+  @inline private def el2String(el: PsiNamedElement): String = el match {
+    case fun: ScFun => fun.methodType.toString
+    case f: ScFunction => "???1"
+      val name = f.name
+      val ty = f.getType().getOrNothing
+      s"$name: $ty"
+    case p: ScPrimaryConstructor => "???2"
+    case m: PsiMethod => "???3"
+    case refPatt: ScReferencePattern => refPatt.getParent.getParent match { // TODO temroary
+      case pd: ScPatternDefinition if PsiTreeUtil.isContextAncestor(pd, el, true) =>
+        val name = pd.declaredNames.headOption.getOrElse("unknown")
+        val ty = pd.getType().getOrNothing
+        s"$name.apply: $ty"
+      case vd: ScVariableDefinition if PsiTreeUtil.isContextAncestor(vd, el, true) =>
+        val name = vd.declaredNames.headOption.getOrElse("unknown")
+        val ty = vd.getType().getOrNothing
+        s"$name.apply: $ty"
+      case _ => "unknown"
+    }
+    case typed: ScTypedDefinition => "???5"
+    case f: PsiField => "???6"
+    case _ => "unknown"
+  }
 
   case class Value(el: PsiNamedElement, candidate: DCHandler.Resolver#Candidate, prefix: String = "")
   case class CandidateValue(el: PsiNamedElement, candidate: DCHandler.Resolver#Candidate)
@@ -83,13 +114,38 @@ object DCTreeStructureResolver {
   case class WeightsValue(weights: Map[PsiNamedElement, DCHandler.Resolver#Weight])
   case class WeightValue(el: PsiNamedElement, weight: DCHandler.Resolver#Weight)
 
-  class CandidateNode(value: CandidateValue)(implicit project: Project) extends AbstractTreeNode[CandidateValue](project, value) {
-//    private val problems = value.candidate.rr.iterator.flatMap { rr =>
-//      rr.problems.map { p =>
-//        new ProblemNode(project, ProblemValue(p.toString))
-//      }
-//    }.toSeq
+//  class CandidateNode(value: CandidateValue)(implicit project: Project) extends AbstractTreeNode[CandidateValue](project, value) {
+////    private val problems = value.candidate.rr.iterator.flatMap { rr =>
+////      rr.problems.map { p =>
+////        new ProblemNode(project, ProblemValue(p.toString))
+////      }
+////    }.toSeq
+//
+//    private val greaterWeight = value.candidate.weights.values.forall(w => w.v > w.opposite)
+//    private val restictionsHaveSolution = value.candidate.restrictions.forall(_.`type`.nonEmpty)
+//    private val conditionsExists = value.candidate.args.forall(_.conditions.exists(_.satisfy))
+//    private val weights = Some(value.candidate.weights).filter(_.nonEmpty).map(w => new WeightNode(WeightsValue(w)))
+//    private val compatibility = Some(value.candidate.args).filter(_.nonEmpty).map(a => new CompatibilityNode(CompatibilityValue(a)))
+//    private val restrictions = Some(value.candidate.restrictions).filter(_.nonEmpty).map(r => new SubstitutorNode(SubstitutorValue(r)))
+//
+//
+//    override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
+//      val list = new util.ArrayList[AbstractTreeNode[_]]()
+//      compatibility.foreach(list.add)
+//      restrictions.foreach(list.add)
+//      weights.foreach(list.add)
+//      list
+//    }
+//
+//    override def update(presentationData: PresentationData): Unit = {
+//      val text = el2String(value.el)
+//      presentationData.setPresentableText(text)
+//      if (!greaterWeight || !conditionsExists || !restictionsHaveSolution)
+//        presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
+//    }
+//  }
 
+  class CandidateNode(value: CandidateValue)(implicit project: Project) extends AbstractPsiBasedNode[CandidateValue](project, value, ViewSettings.DEFAULT) {
     private val greaterWeight = value.candidate.weights.values.forall(w => w.v > w.opposite)
     private val restictionsHaveSolution = value.candidate.restrictions.forall(_.`type`.nonEmpty)
     private val conditionsExists = value.candidate.args.forall(_.conditions.exists(_.satisfy))
@@ -97,8 +153,7 @@ object DCTreeStructureResolver {
     private val compatibility = Some(value.candidate.args).filter(_.nonEmpty).map(a => new CompatibilityNode(CompatibilityValue(a)))
     private val restrictions = Some(value.candidate.restrictions).filter(_.nonEmpty).map(r => new SubstitutorNode(SubstitutorValue(r)))
 
-
-    override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
+    override def getChildrenImpl: util.Collection[AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
       compatibility.foreach(list.add)
       restrictions.foreach(list.add)
@@ -106,23 +161,16 @@ object DCTreeStructureResolver {
       list
     }
 
-    override def update(presentationData: PresentationData): Unit = {
+    override def updateImpl(presentationData: PresentationData): Unit = {
       val text = el2String(value.el)
       presentationData.setPresentableText(text)
       if (!greaterWeight || !conditionsExists || !restictionsHaveSolution)
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
+
+    override def extractPsiFromValue(): PsiElement = value.el
   }
 
-//  class ProblemNode(project: Project, problem: ProblemValue) extends AbstractTreeNode[ProblemValue](project, problem) {
-//    override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = new util.ArrayList[AbstractTreeNode[_]]()
-//
-//    override def update(presentationData: PresentationData): Unit = {
-//      presentationData.setPresentableText(problem.problem)
-//      presentationData.setAttributesKey(CodeInsightColors.ERRORS_ATTRIBUTES)
-//      presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
-//    }
-//  }
 
   class WeightNode(weight: WeightsValue)(implicit project: Project) extends AbstractTreeNode[WeightsValue](project, weight) {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {

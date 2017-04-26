@@ -40,6 +40,7 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
                                    expandInnerResult: Boolean = true): Option[ScalaResolveResult] = {
     mostSpecificGeneric(applicable.map(r => r.innerResolveResult match {
       case Some(rr) if expandInnerResult =>
+        handler.foreach(_.addMapping(rr.getElement, r.getElement))
         new InnerScalaResolveResult(rr.element, rr.implicitConversionClass, r, r.substitutor)
       case _ =>
         new InnerScalaResolveResult(r.element, r.implicitConversionClass, r, r.substitutor)

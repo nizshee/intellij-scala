@@ -1,19 +1,22 @@
 package org.jetbrains.plugins.scala.actions
 
+import java.awt.event.MouseEvent
 import java.awt.{BorderLayout, Dimension}
-import javax.swing.JPanel
-import javax.swing.tree.{DefaultMutableTreeNode, DefaultTreeModel}
+import javax.swing.{JPanel, JTree}
+import javax.swing.tree.{DefaultMutableTreeNode, DefaultTreeModel, TreePath}
 
-import com.intellij.ide.util.treeView.{AbstractTreeBuilder, AbstractTreeStructure}
-import com.intellij.openapi.actionSystem.{AnAction, AnActionEvent, CommonDataKeys}
+import com.intellij.ide.util.treeView.{AbstractTreeBuilder, AbstractTreeNode, AbstractTreeStructure}
+import com.intellij.openapi.actionSystem._
+import com.intellij.openapi.command.CommandProcessor
 import com.intellij.openapi.editor.Editor
+import com.intellij.openapi.fileEditor.ex.IdeDocumentHistory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.popup.{JBPopup, JBPopupFactory}
-import com.intellij.openapi.util.Disposer
+import com.intellij.openapi.util.{Disposer, Ref}
 import com.intellij.psi.search.GlobalSearchScope
 import com.intellij.psi.util.PsiUtilBase
 import com.intellij.psi.{PsiElement, PsiNamedElement, PsiWhiteSpace}
-import com.intellij.ui.ScrollPaneFactory
+import com.intellij.ui.{ClickListener, ScrollPaneFactory}
 import com.intellij.ui.treeStructure.Tree
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScReferenceElement
@@ -26,20 +29,59 @@ import org.jetbrains.plugins.scala.lang.resolve.processor.MethodResolveProcessor
 import org.jetbrains.plugins.scala.lang.resolve.{ReferenceExpressionResolver, ScalaResolveResult}
 
 
-object DebugConformanceAction {
-
-
-
-}
 
 /**
   * Created by user on 3/20/17.
   */
 class DebugConformanceAction extends AnAction("Debug conformance action") {
 
+  private def getSelectedNode(jTree: JTree): AbstractTreeNode[_] = {
+    val path: TreePath = jTree.getSelectionPath
+    if (path != null) {
+      var component: AnyRef = path.getLastPathComponent
+      component match {
+        case node: DefaultMutableTreeNode =>
+          component = node.getUserObject
+          component match {
+            case abstractTreeNode: AbstractTreeNode[_] => return abstractTreeNode
+            case _ =>
+          }
+        case _ =>
+      }
+    }
+    null
+  }
+
+  private def navigateSelectedElement(popup: JBPopup, jTree: JTree, project: Project): Boolean = {
+    val selectedNode: AbstractTreeNode[_] = getSelectedNode(jTree)
+
+    val succeeded: Ref[Boolean] = new Ref[Boolean]
+    val commandProcessor: CommandProcessor = CommandProcessor.getInstance
+    commandProcessor.executeCommand(project, new Runnable {
+      def run(): Unit = {
+        if (selectedNode != null) {
+          if (selectedNode.canNavigateToSource) {
+            popup.cancel()
+            selectedNode.navigate(true)
+            succeeded.set(true)
+          }
+          else {
+            succeeded.set(false)
+          }
+        }
+        else {
+          succeeded.set(false)
+        }
+        IdeDocumentHistory.getInstance(project).includeCurrentCommandAsNavigation()
+      }
+    }, "Navigate", null)
+    succeeded.get
+  }
+
+
   private def showHint(hint: String)(implicit editor: Editor) = ScalaActionUtil.showHint(editor, hint)
 
-  private def showPopup(treeStructure: AbstractTreeStructure)(implicit editor: Editor) = {
+  private def showPopup(treeStructure: AbstractTreeStructure)(implicit project: Project, editor: Editor) = {
     val tree = new Tree()
 
     val builder = new AbstractTreeBuilder(tree, new DefaultTreeModel(new DefaultMutableTreeNode), treeStructure, null) {
@@ -58,12 +100,33 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
     panel.add(scrollPane, BorderLayout.CENTER)
 
+    val enter: Array[Shortcut] = CustomShortcutSet.fromString("ENTER").getShortcuts
+    val shortcutSet: CustomShortcutSet = new CustomShortcutSet(enter: _*)
+
     val popup: JBPopup = JBPopupFactory.getInstance().createComponentPopupBuilder(panel, jTree).
       setRequestFocus(true).
       setResizable(true).
       setTitle("Debug Conformance:").
       setMinSize(new Dimension(size.width + 500, size.height)).
       createPopup
+
+    new AnAction {
+      def actionPerformed(e: AnActionEvent) {
+        val succeeded: Boolean = navigateSelectedElement(popup, jTree, project)
+        if (succeeded) {
+          unregisterCustomShortcutSet(panel)
+        }
+      }
+    }.registerCustomShortcutSet(shortcutSet, panel)
+
+    new ClickListener {
+      def onClick(e: MouseEvent, clickCount: Int): Boolean = {
+        val path: TreePath = jTree.getPathForLocation(e.getX, e.getY)
+        if (path == null) return false
+        navigateSelectedElement(popup, jTree, project)
+        true
+      }
+    }.installOn(jTree)
 
     Disposer.register(popup, builder)
 

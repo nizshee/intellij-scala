@@ -134,18 +134,23 @@ object DCHandler {
                          args: Seq[DCHandler.Compatibility#Arg],
                          restrictions: Seq[DCHandler.Substitutor#Restriction])
 
-    private var last: Option[PsiNamedElement] = None
+    private var _last: Option[PsiNamedElement] = None
     private var _candidates: Map[PsiNamedElement, Candidate] = Map.empty
+    private var _elementMap: Map[PsiNamedElement, PsiNamedElement] = Map.empty
+
+    private def resolve(el: PsiNamedElement) = _elementMap.getOrElse(el, el)
+
+    def addMapping(el1: PsiNamedElement, el2: PsiNamedElement): Unit = _elementMap += el1 -> el2
 
     def +(el: PsiNamedElement): Candidate = {
       val candidate = Candidate(None, Map.empty, Seq.empty, Seq.empty)
-      last = Some(el)
+      _last = Some(el)
       _candidates += el -> candidate
       candidate
     }
 
     def +(rr: ScalaResolveResult): Unit = {
-      last.flatMap(el => _candidates.get(el).map(el -> _)) match {
+      _last.flatMap(el => _candidates.get(el).map(el -> _)) match {
         case Some((el, candidate)) =>
           _candidates += el -> candidate.copy(rr = Some(rr))
         case _ =>
@@ -153,7 +158,7 @@ object DCHandler {
     }
 
     def addRestrictions(restrictions: Seq[Substitutor#Restriction]): Unit = {
-      last.flatMap(el => _candidates.get(el).map(el -> _)) match {
+      _last.flatMap(el => _candidates.get(el).map(el -> _)) match {
         case Some((el, candidate)) =>
           _candidates += el -> candidate.copy(restrictions = restrictions)
         case None =>
@@ -161,48 +166,42 @@ object DCHandler {
     }
 
     def +(args: Seq[DCHandler.Compatibility#Arg]): Unit = {
-      last.flatMap(el => _candidates.get(el).map(el -> _)) match {
+      _last.flatMap(el => _candidates.get(el).map(el -> _)) match {
         case Some((el, candidate)) =>
           _candidates += el -> candidate.copy(args = args)
         case None =>
       }
     }
 
-    def addWeight(left: PsiNamedElement, right: PsiNamedElement, weight: Weight): Unit = {
-      _candidates.get(left) match {
-        case Some(candidate) =>
-          _candidates += left -> candidate.copy(
-            weights = candidate.weights.updated(right, weight)
-          )
-        case _ =>
-      }
-    }
-
-    def addWeight(left: PsiNamedElement, right: PsiNamedElement, v: Int): Unit = {
-      val candidate = _candidates.getOrElse(left, Candidate(None, Map.empty, Seq.empty, Seq.empty))
-      val weight = candidate.weights.getOrElse(right, Weight(0, 0, None, None))
-      _candidates += left -> candidate.copy(
-        weights = candidate.weights.updated(right, weight.copy(v = v))
+    def addWeight(left: PsiNamedElement, right: PsiNamedElement, v: Int): Unit = { // TODO? remove
+      val _left = resolve(left)
+      val _right = resolve(right)
+      val candidate = _candidates.getOrElse(_left, Candidate(None, Map.empty, Seq.empty, Seq.empty))
+      val weight = candidate.weights.getOrElse(_right, Weight(0, 0, None, None))
+      _candidates += _left -> candidate.copy(
+        weights = candidate.weights.updated(_right, weight.copy(v = v))
       )
 
-      val rCandidate = _candidates.getOrElse(right, Candidate(None, Map.empty, Seq.empty, Seq.empty))
-      val rWeight = rCandidate.weights.getOrElse(left, Weight(0, 0, None, None))
-      _candidates += right -> rCandidate.copy(
-        weights = rCandidate.weights.updated(left, rWeight.copy(opposite = v))
+      val rCandidate = _candidates.getOrElse(_right, Candidate(None, Map.empty, Seq.empty, Seq.empty))
+      val rWeight = rCandidate.weights.getOrElse(_left, Weight(0, 0, None, None))
+      _candidates += _right -> rCandidate.copy(
+        weights = rCandidate.weights.updated(_left, rWeight.copy(opposite = v))
       )
     }
 
     def addWeight(left: PsiNamedElement, right: PsiNamedElement, asSpecificAs: AsSpecificAsCondition): Unit = {
-      val candidate = _candidates.getOrElse(left, Candidate(None, Map.empty, Seq.empty, Seq.empty))
-      val weight = candidate.weights.getOrElse(right, Weight(0, 0, None, None))
-      _candidates += left -> candidate.copy(
-        weights = candidate.weights.updated(right, weight.copy(asSpecificAs = Some(asSpecificAs)))
+      val _left = resolve(left)
+      val _right = resolve(right)
+      val candidate = _candidates.getOrElse(_left, Candidate(None, Map.empty, Seq.empty, Seq.empty))
+      val weight = candidate.weights.getOrElse(_right, Weight(0, 0, None, None))
+      _candidates += _left -> candidate.copy(
+        weights = candidate.weights.updated(_right, weight.copy(asSpecificAs = Some(asSpecificAs)))
       )
 
-      val rCandidate = _candidates.getOrElse(right, Candidate(None, Map.empty, Seq.empty, Seq.empty))
-      val rWeight = rCandidate.weights.getOrElse(left, Weight(0, 0, None, None))
-      _candidates += right -> rCandidate.copy(
-        weights = rCandidate.weights.updated(left, rWeight.copy(/*opposite = rWeight.opposite + 1*/))
+      val rCandidate = _candidates.getOrElse(_right, Candidate(None, Map.empty, Seq.empty, Seq.empty))
+      val rWeight = rCandidate.weights.getOrElse(_left, Weight(0, 0, None, None))
+      _candidates += _right -> rCandidate.copy(
+        weights = rCandidate.weights.updated(_left, rWeight.copy(/*opposite = rWeight.opposite + 1*/))
       )
     }
 

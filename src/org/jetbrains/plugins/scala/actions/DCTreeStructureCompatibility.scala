@@ -7,9 +7,7 @@ import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
 import org.jetbrains.plugins.scala.actions.AsSpecificAsCondition._
-import org.jetbrains.plugins.scala.actions.DCTreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue}
-import org.jetbrains.plugins.scala.lang.psi.types.api.UndefinedType
-import org.jetbrains.plugins.scala.lang.psi.types.{ScUndefinedSubstitutor, ScalaTypeSystem}
+import org.jetbrains.plugins.scala.actions.DCTreeStructureConformance.{RelationNode, RelationValue}
 
 
 object DCTreeStructureCompatibility {
@@ -42,6 +40,13 @@ object DCTreeStructureCompatibility {
   class MostSpecificNode(value: MostSpecificValue)(implicit project: Project) extends AbstractTreeNode[MostSpecificValue](project, value) {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
+      value.asSpecificAsCondition match {
+        case Method(_, _, args) =>
+          list.add(new CompatibilityNode(CompatibilityValue(args)))
+        case Conforms(left, right, conditions) =>
+          list.add(new RelationNode(RelationValue(Relation.Conformance(left, right, conditions))))
+        case _ =>
+      }
       list
     }
 
@@ -51,13 +56,15 @@ object DCTreeStructureCompatibility {
           s"method $left as specific as $right"
         case Polymorphic(_) =>
           "todo"
-        case Other(satisfy) =>
+        case Other(_) =>
           s"not polymorphic or method always as specific as polymorphic or method"
         case Explanation(txt, _) => txt
-        case Conforms(left, right, _) =>
+        case Conforms(_, _, _) =>
           s"if not method type then conformance"
       }
       presentationData.setPresentableText(text)
+      if (!value.asSpecificAsCondition.satisfy)
+        presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
   }
 }
