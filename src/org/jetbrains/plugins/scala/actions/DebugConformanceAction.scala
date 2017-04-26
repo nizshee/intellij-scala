@@ -145,6 +145,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     implicit val project: Project = editor.getProject
     val handler = new DCHandler.Resolver("", true) // TODO? uncomment
     ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
+//    ReferenceExpressionResolver.resolve(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
 
     val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2)) // TODO receives already shaped alternatives - magic
     println(values)

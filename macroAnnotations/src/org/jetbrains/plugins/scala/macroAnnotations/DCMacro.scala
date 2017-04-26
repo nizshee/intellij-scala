@@ -210,8 +210,9 @@ object generateInstrumentationMacro {
       }
     }
 
-    def instrumentedTransformer(init: Set[String] = Set(parameter)) = new Transformer {
+    def instrumentedTransformer(init: Set[String] = Set(parameter), clazz: Option[String]) = new Transformer {
       private var instrumentation = init
+      private var _clazz: Option[String] = clazz
 
       override def transform(tree: c.universe.Tree): c.universe.Tree = tree match {
         case Apply(Select(New(Ident(TypeName(cName))), TermName("<init>")), args) => // TODO merge?
@@ -233,11 +234,14 @@ object generateInstrumentationMacro {
           val res = super.transform(f)
           instrumentation ++= permitted
           res
-        case c@ClassDef(_, _, _, Template(p, _, body)) =>
+        case c@ClassDef(_, TypeName(name), _, Template(p, _, body)) =>
           val (_, nForbidden) = prepareBlock(body, instrumentation, remove = false, isUpper = false)
           val pForbidden = instrumentation
+          val pClazz = _clazz
           instrumentation = nForbidden
+          _clazz = Some(name)
           val res = super.transform(c)
+          _clazz = pClazz
           instrumentation = pForbidden
           res
         case b@Block(body, _) =>
@@ -282,7 +286,9 @@ object generateInstrumentationMacro {
             case o => o
           } else args
           super.transform(Apply(nName, nArgs))
-        case Select(Super(This(TypeName("")), TypeName("")), TermName(method)) => Ident(TermName(method + "$IS"))
+        case Select(Super(This(TypeName("")), TypeName("")), TermName(method)) if _clazz.exists(_.endsWith("$I")) =>
+          println(currentClass.fullName)
+          Ident(TermName(method + "$IS"))
         case _ => super.transform(tree)
       }
     }
@@ -302,7 +308,7 @@ object generateInstrumentationMacro {
     @inline def genetateInstrumented(method: DefDef): DefDef = method match {
       case DefDef(mods, TermName(name), types, args, tpt, rhs) =>
         val nName = name + "$I"
-        val nRhs = instrumentedTransformer().transform(rhs)
+        val nRhs = instrumentedTransformer(clazz = None).transform(rhs)
         DefDef(mods, TermName(nName), types, args, tpt, nRhs)
     }
 
@@ -344,7 +350,7 @@ object generateInstrumentationMacro {
           case o => Seq(o)
         }
 
-        val nBody = iiBody.map(instrumentedTransformer(instrumented).transform(_))
+        val nBody = iiBody.map(instrumentedTransformer(instrumented, Some("$I")).transform(_))
         ClassDef(mods.removeFlag(Flag.CASE | Flag.PRIVATE | Flag.PROTECTED), TypeName("$I"), targs, Template(List(parent), self, nBody))
     }
 
@@ -398,8 +404,8 @@ object generateInstrumentationMacro {
     }
 
     if (debug) {
-//      println(annottee)
-//      expandees.foreach(println)
+      println(annottee)
+      expandees.foreach(println)
     }
 
     c.Expr[Any](Block(expandees, Literal(Constant(()))))

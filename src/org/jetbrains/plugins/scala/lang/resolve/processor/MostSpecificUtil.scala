@@ -32,7 +32,7 @@ import scala.collection.mutable.ArrayBuffer
   * User: Alexander Podkhalyuzin
   * Date: 26.04.2010
   */
-@uninstrumental("handler", debug = true)
+@uninstrumental("handler")
 case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHandler.Resolver] = None)
                            (implicit typeSystem: TypeSystem) {
   def mostSpecificForResolveResult(applicable: Set[ScalaResolveResult],
@@ -162,7 +162,7 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
           }
         }
 
-//        var conf = handler.flatMap(_ => Option.empty[Either[DCHandler.Args, DCHandler.Conditions]])
+        var conf = handler.flatMap(_ => Option.empty[Either[DCHandler.Args, DCHandler.Conditions]])
         val conformance = (calcParams(t1, existential = true), calcParams(t2, existential = false)) match {
           case (Left(p1), Left(p2)) =>
             var (params1, params2) = (p1, p2)
@@ -194,18 +194,18 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
               new Expression(if (params1.nonEmpty) params1.last.paramType else Nothing, elem)
             val exprs: Seq[Expression] = params1.map(p => new Expression(p.paramType, elem)) ++
               Seq.fill(i)(default)
-//            handler.foreach { h =>
-//              val inner = handler.map(_.compatibility)
-//              Compatibility.checkConformance(checkNames = false, params2, exprs, checkImplicits, handler = inner)
-//              conf = Some(Left(inner.get.args))
-//            }
+            handler.foreach { h =>
+              val inner = handler.map(_.compatibility)
+              Compatibility.checkConformance(checkNames = false, params2, exprs, checkImplicits, handler = inner)
+              conf = Some(Left(inner.get.args))
+            }
             Compatibility.checkConformance(checkNames = false, params2, exprs, checkImplicits)
           case (Right(type1), Right(type2)) =>
-//            handler.foreach { h =>
-//              val inner = handler.map(_.conforemance)
-//              Conformance.conformsInner(type2, type1, handler = inner)
-//              conf = Some(Right(inner.get.conditions))
-//            }
+            handler.foreach { h =>
+              val inner = handler.map(_.conforemance)
+              Conformance.conformsInner(type2, type1, handler = inner)
+              conf = Some(Right(inner.get.conditions))
+            }
             type1.conforms(type2, ScUndefinedSubstitutor()) //todo: with implcits?
           //todo this is possible, when one variant is empty with implicit parameters, and second without parameters.
           //in this case it's logical that method without parameters must win...
@@ -258,13 +258,13 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
             }
           case _ =>
         }
-//        handler.foreach { h =>
-//          conf.get match {
-//            case Left(args) =>
-//              h.addWeight(r1.element, r2.element, AsSpecificAsCondition.Method(t1, t2, args))
-//            case _ => // TODO
-//          }
-//        }
+        handler.foreach { h =>
+          conf.get match {
+            case Left(args) =>
+              h.addWeight(r1.element, r2.element, AsSpecificAsCondition.Method(t1, t2, args))
+            case _ => // TODO
+          }
+        }
         u.getSubstitutor.isDefined
       case (_, _: PsiMethod) =>
         handler.foreach(_.addWeight(r1.element, r2.element, AsSpecificAsCondition.Explanation("psi methods", satisfy = true)))
@@ -353,7 +353,7 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
           if (a1 != a2 && !isMoreSpecific(a1, a2, checkImplicits)) break = true
         }
         if (!break) {
-          /*if (handler.isEmpty) */ return Some(a1) // TODO? uncomment
+          /*if (handler.isEmpty) */ return Some(a1) // TODO?! uncomment
           /*else res = Some(a1)*/
         }
       }

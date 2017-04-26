@@ -2,12 +2,10 @@ package org.jetbrains.plugins.scala
 package lang
 package resolve
 
-import java.io.FileWriter
-import java.nio.file.{Files, Paths}
-
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi._
 import com.intellij.psi.util.PsiTreeUtil
+import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.caches.CachesUtil
 import org.jetbrains.plugins.scala.extensions.{PsiMethodExt, PsiNamedElementExt}
 import org.jetbrains.plugins.scala.lang.psi.ScalaPsiUtil
@@ -34,8 +32,6 @@ import org.jetbrains.plugins.scala.lang.psi.types.{ScSubstitutor, ScType, ScalaT
 import org.jetbrains.plugins.scala.lang.refactoring.util.ScalaNamesUtil
 import org.jetbrains.plugins.scala.lang.resolve.processor.DynamicResolveProcessor._
 import org.jetbrains.plugins.scala.lang.resolve.processor._
-import org.jetbrains.plugins.scala.actions.DCHandler
-import org.jetbrains.plugins.scala.actions.DCHandler.Resolver
 import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
 
 import scala.annotation.tailrec
@@ -133,12 +129,6 @@ object ReferenceExpressionResolver {
             while (iterator.hasNext) {
               levelSet.add(iterator.next())
             }
-            handler.foreach { h => // TODO? remove
-              val it = levelSet.iterator()
-              while (it.hasNext) h.log(it.next())
-              h.log(super.candidatesS)
-              h.log("!!!")
-            }
             super.candidatesS
           }
         }
@@ -178,6 +168,7 @@ object ReferenceExpressionResolver {
   @uninstrumental("handler")
   def doResolve(ref: ScReferenceExpression, processor: BaseProcessor, accessibilityCheck: Boolean = true,
                 handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
+    handler.foreach(_.log("!!!"))
     implicit val manager = ref.getManager
     implicit val typeSystem = ref.typeSystem
 
