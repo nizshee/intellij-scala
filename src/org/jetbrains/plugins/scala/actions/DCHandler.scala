@@ -214,6 +214,11 @@ object DCHandler {
 
     def substitutor: Substitutor = new Substitutor(delimter + "s|", debug)
 
+    def conforemance: Conformance = new Conformance(delimter + "r|", debug)
+
     def candidates: List[(PsiNamedElement, Candidate)] = _candidates.toList
   }
+
+  type Args = Seq[DCHandler.Compatibility#Arg]
+  type Conditions = Seq[ConformanceCondition]
 }

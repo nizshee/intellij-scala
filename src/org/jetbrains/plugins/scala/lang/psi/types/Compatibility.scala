@@ -124,11 +124,13 @@ object Compatibility {
       ScalaType.designator
     }
 
+  @uninstrumental("handler")
   def checkConformance(checkNames: Boolean,
                        parameters: Seq[Parameter],
                        exprs: Seq[Expression],
-                       checkWithImplicits: Boolean): (Boolean, ScUndefinedSubstitutor) = {
-    val r = checkConformanceExt(checkNames, parameters, exprs, checkWithImplicits, isShapesResolve = false)
+                       checkWithImplicits: Boolean,
+                       handler: Option[DCHandler.Compatibility] = None): (Boolean, ScUndefinedSubstitutor) = {
+    val r = checkConformanceExt(checkNames, parameters, exprs, checkWithImplicits, isShapesResolve = false, handler = handler)
     (r.problems.isEmpty, r.undefSubst)
   }
 

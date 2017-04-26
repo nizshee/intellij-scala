@@ -11,3 +11,9 @@ def f(handler: Option[Int]): Int = {
 class C(handler: Option[Int]) {
   def get: Int = 2
 }
+
+@identity
+class D {
+  var a = 1
+  a = 2
+}

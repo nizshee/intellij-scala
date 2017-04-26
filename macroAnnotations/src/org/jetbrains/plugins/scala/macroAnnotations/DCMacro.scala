@@ -139,6 +139,10 @@ object generateInstrumentationMacro {
           val (nTail, nForbidden) = prepareBlock(tail, instrumentation, remove, isUpper)
           val list = if (remove) nTail else head :: nTail
           (list, nForbidden)
+        case Assign(Ident(TermName(name)), _) if instrumentation(name) =>
+          val (nTail, nForbidden) = prepareBlock(tail, instrumentation, remove, isUpper)
+          val list = if (remove) nTail else head :: nTail
+          (list, nForbidden)
         case _ =>
           val (nTail, nForbidden) = prepareBlock(tail, instrumentation, remove, isUpper)
           (head :: nTail, nForbidden)
@@ -394,8 +398,8 @@ object generateInstrumentationMacro {
     }
 
     if (debug) {
-      println(annottee)
-      expandees.foreach(println)
+//      println(annottee)
+//      expandees.foreach(println)
     }
 
     c.Expr[Any](Block(expandees, Literal(Constant(()))))

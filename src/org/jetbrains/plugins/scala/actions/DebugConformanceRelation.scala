@@ -102,9 +102,13 @@ sealed trait AsSpecificAsCondition {
 }
 
 object AsSpecificAsCondition {
-  case class Method(left: ScType, right: ScType, satisfy: Boolean) extends AsSpecificAsCondition
+  case class Method(left: ScType, right: ScType, args: DCHandler.Args) extends AsSpecificAsCondition {
+    override def satisfy: Boolean = args.forall(_.satisfy)
+  }
   case class Polymorphic(satisfy: Boolean) extends AsSpecificAsCondition
   case class Other(satisfy: Boolean) extends AsSpecificAsCondition
-  case class Conforms(left: ScType, right: ScType, satisfy: Boolean) extends AsSpecificAsCondition
+  case class Conforms(left: ScType, right: ScType, conditions: Seq[ConformanceCondition]) extends AsSpecificAsCondition {
+    override def satisfy: Boolean = conditions.exists(_.satisfy)
+  }
   case class Explanation(text: String, satisfy: Boolean) extends AsSpecificAsCondition
 }

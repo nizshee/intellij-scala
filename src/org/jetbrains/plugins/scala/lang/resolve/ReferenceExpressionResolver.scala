@@ -107,7 +107,6 @@ object ReferenceExpressionResolver {
 
   @uninstrumental("handler")
   def resolve(reference: ScReferenceExpression, shapesOnly: Boolean, incomplete: Boolean, handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
-    val start = System.nanoTime()
     val name = if (reference.isUnaryOperator) "unary_" + reference.refName else reference.refName
     val info = getContextInfo(reference, reference)
 
@@ -165,7 +164,7 @@ object ReferenceExpressionResolver {
       }
     }
     handler.foreach(_.log(s"processor returned result ${result.toList.map(_.getElement.getNode.getText)}"))
-    val r = if (result.isEmpty && reference.isAssignmentOperator) {
+    if (result.isEmpty && reference.isAssignmentOperator) {
       handler.foreach(_.log("empty result + assignment operator - skip"))
       val assignProcessor = new MethodResolveProcessor(reference, reference.refName.init, List(argumentsOf(reference)),
         Nil, prevInfoTypeParams, isShapeResolve = shapesOnly, enableTupling = true)
@@ -174,13 +173,6 @@ object ReferenceExpressionResolver {
     } else {
       result // TODO? no doResolve in main path?
     }
-    val end = System.nanoTime()
-    val fw = new FileWriter("res", true)
-    try {
-      fw.write((end - start).toString + "\n")
-    }
-    finally fw.close()
-    r
   }
 
   @uninstrumental("handler")
