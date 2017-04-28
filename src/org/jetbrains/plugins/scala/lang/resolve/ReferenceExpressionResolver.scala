@@ -129,10 +129,6 @@ object ReferenceExpressionResolver {
             while (iterator.hasNext) {
               levelSet.add(iterator.next())
             }
-            handler.foreach { _ =>
-              val it = levelSet.iterator()
-              while (it.hasNext) println("!!!" + it.next().element.getNode.getText) // TODO? remove
-            }
             super.candidatesS
           }
         }
@@ -172,7 +168,7 @@ object ReferenceExpressionResolver {
   @uninstrumental("handler")
   def doResolve(ref: ScReferenceExpression, processor: BaseProcessor, accessibilityCheck: Boolean = true,
                 handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
-    handler.foreach(_.log("!!!"))
+    handler.foreach(_.log("doResolve - skip"))
     implicit val manager = ref.getManager
     implicit val typeSystem = ref.typeSystem
 

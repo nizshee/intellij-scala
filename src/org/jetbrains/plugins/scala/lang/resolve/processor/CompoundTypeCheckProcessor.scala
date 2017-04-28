@@ -1,6 +1,7 @@
 package org.jetbrains.plugins.scala.lang.resolve.processor
 
 import com.intellij.psi._
+import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScFieldId
 import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.ScBindingPattern
@@ -11,13 +12,14 @@ import org.jetbrains.plugins.scala.lang.psi.types._
 import org.jetbrains.plugins.scala.lang.psi.types.api.{TypeParameter, Unit}
 import org.jetbrains.plugins.scala.lang.psi.types.result.TypingContext
 import org.jetbrains.plugins.scala.lang.resolve.{ResolveTargets, StdKinds}
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
 
 /**
  * @author Alexander Podkhalyuzin
  */
-
+@uninstrumental("handler")
 class CompoundTypeCheckSignatureProcessor(s: Signature, retType: ScType,
-                                 undefSubst: ScUndefinedSubstitutor, substitutor: ScSubstitutor)
+                                 undefSubst: ScUndefinedSubstitutor, substitutor: ScSubstitutor, handler: Option[DCHandler.Conformance] = None)
   extends BaseProcessor(StdKinds.methodRef + ResolveTargets.CLASS)(ScalaTypeSystem) {
 
   private val name = s.name
@@ -78,6 +80,7 @@ class CompoundTypeCheckSignatureProcessor(s: Signature, retType: ScType,
     //let's check type parameters
     element match {
       case o: ScTypeParametersOwner =>
+        handler.foreach(_.log("CompoundTypeCheckSignatureProcessor type parameters - skip"))
         if (o.typeParameters.length != s.typeParams.length) return true
         val iter = o.typeParameters.zip(s.typeParams).iterator
         while (iter.hasNext) {
@@ -85,13 +88,16 @@ class CompoundTypeCheckSignatureProcessor(s: Signature, retType: ScType,
           if (!checkTypeParameters(tp1, tp2)) return true
         }
       case p: PsiTypeParameterListOwner =>
+        handler.foreach(_.log("CompoundTypeCheckSignatureProcessor type parameters - skip"))
         if (p.getTypeParameters.length != s.typeParams.length) return true
         val iter = p.getTypeParameters.toSeq.zip(s.typeParams).iterator
         while (iter.hasNext) {
           val (tp1, tp2) = iter.next()
           if (!checkTypeParameters(tp1, tp2)) return true
         }
-      case _ => if (s.typeParams.length > 0) return true
+      case _ =>
+        handler.foreach(_.log("CompoundTypeCheckSignatureProcessor type parameters - skip"))
+        if (s.typeParams.length > 0) return true
     }
 
     def checkSignature(sign1: Signature, typeParams: Array[PsiTypeParameter], returnType: ScType): Boolean = {
@@ -131,6 +137,10 @@ class CompoundTypeCheckSignatureProcessor(s: Signature, retType: ScType,
           case param: ScParameter => param.getType(TypingContext.empty).getOrNothing
         })
         val dcl: ScTypedDefinition = element.asInstanceOf[ScTypedDefinition]
+        handler.foreach(_.log("!!!" + (dcl.getParent match {
+          case e: PsiNamedElement => e.name
+          case _ => "undefined"
+        })))
         val isVar = dcl.isVar
         if (!checkSignature(new Signature(dcl.name, Seq.empty, 0, subst, dcl), Array.empty, rt)) return false
         if (isVar && !checkSignature(new Signature(dcl.name + "_=", Seq(() => rt), 1, subst, dcl),
@@ -147,7 +157,8 @@ class CompoundTypeCheckSignatureProcessor(s: Signature, retType: ScType,
   }
 }
 
-class CompoundTypeCheckTypeAliasProcessor(sign: TypeAliasSignature, undefSubst: ScUndefinedSubstitutor, substitutor: ScSubstitutor)
+@uninstrumental("handler")
+class CompoundTypeCheckTypeAliasProcessor(sign: TypeAliasSignature, undefSubst: ScUndefinedSubstitutor, substitutor: ScSubstitutor, handler: Option[DCHandler.Conformance] = None)
   extends BaseProcessor(StdKinds.methodRef + ResolveTargets.CLASS)(ScalaTypeSystem) {
   private val name = sign.name
 
@@ -207,6 +218,7 @@ class CompoundTypeCheckTypeAliasProcessor(sign: TypeAliasSignature, undefSubst: 
     //let's check type parameters
     element match {
       case o: ScTypeParametersOwner =>
+        handler.foreach(_.log("CompoundTypeCheckTypeAliasProcessor type parameters - skip"))
         if (o.typeParameters.length != sign.typeParams.length) return true
         val iter = o.typeParameters.zip(sign.typeParams).iterator
         while (iter.hasNext) {
@@ -214,13 +226,16 @@ class CompoundTypeCheckTypeAliasProcessor(sign: TypeAliasSignature, undefSubst: 
           if (!checkTypeParameters(tp1, tp2)) return true
         }
       case p: PsiTypeParameterListOwner =>
+        handler.foreach(_.log("CompoundTypeCheckTypeAliasProcessor type parameters - skip"))
         if (p.getTypeParameters.length != sign.typeParams.length) return true
         val iter = p.getTypeParameters.toSeq.zip(sign.typeParams).iterator
         while (iter.hasNext) {
           val (tp1, tp2) = iter.next()
           if (!checkTypeParameters(tp1, tp2)) return true
         }
-      case _ => if (sign.typeParams.nonEmpty) return true
+      case _ =>
+        handler.foreach(_.log("CompoundTypeCheckTypeAliasProcessor type parameters - skip"))
+        if (sign.typeParams.nonEmpty) return true
     }
 
     def checkDeclarationForTypeAlias(tp: ScTypeAlias): Boolean = {

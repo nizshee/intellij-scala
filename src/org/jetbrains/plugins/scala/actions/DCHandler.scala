@@ -20,9 +20,6 @@ object DCHandler {
 
   class Conformance(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug) {
 
-//    private val offset = nesting * 1
-//    private val delimeter = if (offset < 1) "" else "|" * (offset - 1) + "|"
-
     private var _conditions: Seq[ConformanceCondition] = Seq()
     private var _variances: Seq[ConformanceCondition.Variance] = Seq()
 

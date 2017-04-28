@@ -909,7 +909,7 @@ object Conformance extends api.Conformance {
     }
 
     override def visitCompoundType(c: ScCompoundType) {
-      handler.foreach(_.visit("visitCompoundType - skip"))
+      handler.foreach(_.visit("visitCompoundType - todo"))
       var rightVisitor: ScalaTypeVisitor =
         new ValDesignatorSimplification with UndefinedSubstVisitor with AbstractVisitor
           with ParameterizedAbstractVisitor {}
@@ -937,14 +937,14 @@ object Conformance extends api.Conformance {
       U1	with	. . .	with	Un       === comps1
       Un                            === compn*/
       def workWithSignature(s: Signature, retType: ScType): Boolean = {
-        val processor = new CompoundTypeCheckSignatureProcessor(s,retType, undefinedSubst, s.substitutor)
+        val processor = new CompoundTypeCheckSignatureProcessor(s, retType, undefinedSubst, s.substitutor, handler = handler)
         processor.processType(r, s.namedElement)
         undefinedSubst = processor.getUndefinedSubstitutor
         processor.getResult
       }
 
       def workWithTypeAlias(sign: TypeAliasSignature): Boolean = {
-        val processor = new CompoundTypeCheckTypeAliasProcessor(sign, undefinedSubst, ScSubstitutor.empty)
+        val processor = new CompoundTypeCheckTypeAliasProcessor(sign, undefinedSubst, ScSubstitutor.empty, handler = handler)
         processor.processType(r, sign.ta)
         undefinedSubst = processor.getUndefinedSubstitutor
         processor.getResult
@@ -962,9 +962,7 @@ object Conformance extends api.Conformance {
     }
 
     override def visitProjectionType(proj: ScProjectionType) {
-      handler.foreach { h =>
-        h.visit("visitProjectionType")
-      }
+      handler.foreach(_.visit("visitProjectionType - ok"))
       var rightVisitor: ScalaTypeVisitor =
         new ValDesignatorSimplification with UndefinedSubstVisitor with AbstractVisitor
           with ParameterizedAbstractVisitor {}
