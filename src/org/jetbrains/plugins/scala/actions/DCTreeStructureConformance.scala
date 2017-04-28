@@ -58,7 +58,7 @@ object DCTreeStructureConformance {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
       relation.v match {
         case r: Relation.Conformance =>
-          r.conditions.foreach { condition =>
+          DebugConformanceAdapter(r).conditions.foreach { condition =>
             list.add(new ConditionNode(ConditionValue(condition)))
           }
         case _ =>
@@ -108,6 +108,8 @@ object DCTreeStructureConformance {
         case c: ConformanceCondition.Method =>
           c.ret.foreach(c => list.add(new RelationNode(RelationValue(c, "ret"))))
           c.args.foreach(c => list.add(new RelationNode(RelationValue(c.relation, "arg"))))
+        case c: ConformanceCondition.CompoundRight =>
+          c.relations.foreach(c => list.add(new RelationNode(RelationValue(c))))
         case _ =>
       }
       list
@@ -141,6 +143,8 @@ object DCTreeStructureConformance {
           s"${c.left} is ${if (c.anyRef) "" else "not "}conforms to AnyRef"
         case c: ConformanceCondition.Undefined =>
           s"${c.left} >: ${c.right} [restriction]"
+        case c: ConformanceCondition.CompoundRight =>
+          s"if exists at least one"
         case _ =>
       }
       val msg = condition.v.msg

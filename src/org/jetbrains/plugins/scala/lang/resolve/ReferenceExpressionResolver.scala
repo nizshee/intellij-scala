@@ -129,6 +129,10 @@ object ReferenceExpressionResolver {
             while (iterator.hasNext) {
               levelSet.add(iterator.next())
             }
+            handler.foreach { _ =>
+              val it = levelSet.iterator()
+              while (it.hasNext) println("!!!" + it.next().element.getNode.getText) // TODO? remove
+            }
             super.candidatesS
           }
         }
@@ -478,9 +482,7 @@ object ReferenceExpressionResolver {
 
     def processTypes(e: ScExpression, processor: BaseProcessor): BaseProcessor = {
       ProgressManager.checkCanceled()
-      handler.foreach { h =>
-        h.logn("processTypes")
-      }
+      handler.foreach(_.logn("processTypes"))
 
       e.getNonValueType() match {
         case Success(ScTypePolymorphicType(internal, tp), _) if tp.nonEmpty &&

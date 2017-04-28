@@ -235,7 +235,7 @@ object Compatibility {
               val (_, subst) = typeSystem.conformance.conformsInner(paramType, exprType,
                 substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = cHandler)
               h + h.Arg(param.name, exprType, paramType, subst,
-                DebugConformanceAdapter(Relation.Conformance(exprType, paramType, cHandler.get.conditions)).conditions)
+                Relation.Conformance(exprType, paramType, cHandler.get.conditions).conditions)
             }
             val conforms = exprType.weakConforms(paramType) // TODO? calculates two times, i'll add third
             matched ::=(param, expr.expr)

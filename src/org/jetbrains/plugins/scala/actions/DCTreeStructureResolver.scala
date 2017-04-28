@@ -43,9 +43,6 @@ class DCTreeStructureResolver(values: Seq[DCTreeStructureResolver.Value])(implic
     case n: CandidateNode =>
       val children = n.getChildren
       children.toArray(new Array[AnyRef](children.size))
-//    case n: ProblemNode =>
-//      val children = n.getChildren
-//      children.toArray(new Array[AnyRef](children.size))
     case n: WeightNode =>
       val children = n.getChildren
       children.toArray(new Array[AnyRef](children.size))

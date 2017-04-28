@@ -2,7 +2,7 @@ package org.jetbrains.plugins.scala.actions
 
 import org.jetbrains.plugins.scala.lang.psi.types.api.{ParameterizedType, UndefinedType}
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.ScMethodType
-import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScType}
+import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScCompoundType, ScType}
 
 
 sealed trait ConformanceCondition {
@@ -80,7 +80,15 @@ object ConformanceCondition {
   }
 
   case class UndefinedLower(left: UndefinedType, right: UndefinedType) extends ConformanceCondition {
-    override def satisfy: Boolean = ???
+    override def satisfy: Boolean = true // TODO? was ???, why?
+  }
+
+  case class CompoundRight(left: ScType, right: ScCompoundType, relations: Seq[Relation.Conformance]) extends ConformanceCondition {
+    override def satisfy: Boolean = relations.exists(_.satisfy)
+  }
+
+  case class CompoundLeft(left: ScCompoundType, right: ScCompoundType, relations: Seq[Relation.Conformance]) extends ConformanceCondition {
+    override def satisfy: Boolean = relations.forall(_.satisfy)
   }
 
 }

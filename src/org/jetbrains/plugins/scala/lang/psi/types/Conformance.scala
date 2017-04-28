@@ -403,30 +403,22 @@ object Conformance extends api.Conformance {
 
     trait OtherNonvalueTypesVisitor extends ScalaTypeVisitor {
       override def visitUndefinedType(u: UndefinedType) {
-        handler.foreach { h =>
-          h.rvisit("OtherNonvalueTypes - undefined - skip")
-        }
+        handler.foreach(_.rvisit("OtherNonvalueTypes - undefined - skip"))
         result = (false, undefinedSubst)
       }
 
       override def visitMethodType(m: ScMethodType) {
-        handler.foreach { h =>
-          h.rvisit("OtherNonvalueTypes - method - skip")
-        }
+        handler.foreach(_.rvisit("OtherNonvalueTypes - method - skip"))
         result = (false, undefinedSubst)
       }
 
       override def visitAbstractType(a: ScAbstractType) {
-        handler.foreach { h =>
-          h.rvisit("OtherNonvalueTypes - abstract - skip")
-        }
+        handler.foreach(_.rvisit("OtherNonvalueTypes - abstract - skip"))
         result = (false, undefinedSubst)
       }
 
       override def visitTypePolymorphicType(t: ScTypePolymorphicType) {
-        handler.foreach { h =>
-          h.rvisit("OtherNonvalueTypes - typePolymorphic - skip")
-        }
+        handler.foreach(_.rvisit("OtherNonvalueTypes - typePolymorphic - skip"))
         result = (false, undefinedSubst)
       }
     }
@@ -495,9 +487,7 @@ object Conformance extends api.Conformance {
 
     trait ThisVisitor extends ScalaTypeVisitor {
       override def visitThisType(t: ScThisType) {
-        handler.foreach { h =>
-          h.rvisit("ThisVisitor - todo")
-        }
+        handler.foreach(_.rvisit("ThisVisitor - todo"))
         val clazz = t.element
         val res = clazz.getTypeWithProjections(TypingContext.empty)
         if (res.isEmpty) result = (false, undefinedSubst)
@@ -507,9 +497,7 @@ object Conformance extends api.Conformance {
 
     trait DesignatorVisitor extends ScalaTypeVisitor {
       override def visitDesignatorType(d: ScDesignatorType) {
-        handler.foreach { h =>
-          h.rvisit("DesignatorVisitor - ok")
-        }
+        handler.foreach(_.rvisit("DesignatorVisitor - ok"))
         d.element match {
           case v: ScBindingPattern =>
             val res = v.getType(TypingContext.empty)
@@ -560,9 +548,7 @@ object Conformance extends api.Conformance {
 
     trait ParameterizedAliasVisitor extends ScalaTypeVisitor {
       override def visitParameterizedType(p: ParameterizedType) {
-        handler.foreach { h =>
-          h.rvisit("ParameterizedAliasVisitor - ok")
-        }
+        handler.foreach(_.rvisit("ParameterizedAliasVisitor - ok"))
         p.isAliasType match {
           case Some(AliasType(_, _, upper)) =>
             if (upper.isEmpty) {
@@ -587,9 +573,7 @@ object Conformance extends api.Conformance {
       def stopDesignatorAliasOnFailure: Boolean = false
 
       override def visitDesignatorType(des: ScDesignatorType) {
-        handler.foreach { h =>
-          h.rvisit("AliasDesignatorVisitor - ok")
-        }
+        handler.foreach(_.rvisit("AliasDesignatorVisitor - ok"))
         des.isAliasType match {
           case Some(AliasType(_, _, upper)) =>
             if (upper.isEmpty) return
@@ -610,9 +594,7 @@ object Conformance extends api.Conformance {
 
     trait CompoundTypeVisitor extends ScalaTypeVisitor {
       override def visitCompoundType(c: ScCompoundType) {
-        handler.foreach { h =>
-          h.rvisit("CompoundTypeVisitor - skip")
-        }
+        handler.foreach(_.rvisit("CompoundTypeVisitor - ok"))
         var comps = c.components.toList
         var results = List[ScUndefinedSubstitutor]()
         def traverse(check: (ScType, ScUndefinedSubstitutor) => (Boolean, ScUndefinedSubstitutor)) = {
@@ -626,8 +608,27 @@ object Conformance extends api.Conformance {
             }
           }
         }
-        traverse(Equivalence.equivInner(l, _, _))
-        traverse(conformsInner(l, _, HashSet.empty, _, handler = handler.map(_.inner)))
+        var relations = handler.map(_ => Seq.empty[Relation.Conformance])
+        traverse { (t, s) =>
+          handler.foreach { _ =>
+            val r = Equivalence.equivInner(l, t, s)
+            if (r._1) relations = Some(
+              relations.get :+
+                Relation.Conformance(l, t, Seq(ConformanceCondition.Equivalent(Relation.Equivalence(l, t, r._1))))
+            )
+          }
+          Equivalence.equivInner(l, t, s)
+        }
+        traverse { (t, s) =>
+          handler.foreach { _ =>
+            val inner = handler.map(_.inner)
+            conformsInner(l, t, HashSet.empty, s, handler = inner)
+            relations = Some(relations.get :+ Relation.Conformance(l, t, inner.get.conditions))
+          }
+          conformsInner(l, t, HashSet.empty, s)
+        }
+
+        handler.foreach(_ + ConformanceCondition.CompoundRight(l, c, relations.get))
 
         if (results.length == 1) {
           result = (true, results.head)
@@ -639,7 +640,7 @@ object Conformance extends api.Conformance {
 
         result = l.isAliasType match {
           case Some(AliasType(_: ScTypeAliasDefinition, Success(comp: ScCompoundType, _), _)) =>
-            conformsInner(comp, c, HashSet.empty, undefinedSubst, handler = handler.map(_.inner))
+            conformsInner(comp, c, HashSet.empty, undefinedSubst, handler = handler)
           case _ => (false, undefinedSubst)
         }
       }
@@ -647,9 +648,7 @@ object Conformance extends api.Conformance {
 
     trait ExistentialVisitor extends ScalaTypeVisitor {
       override def visitExistentialType(ex: ScExistentialType) {
-        handler.foreach { h =>
-          h.rvisit("ExistentialVisitor - skip")
-        }
+        handler.foreach(_.rvisit("ExistentialVisitor - skip"))
         result = conformsInner(l, ex.quantified, HashSet.empty, undefinedSubst, handler = handler.map(_.inner))
       }
     }
@@ -910,9 +909,7 @@ object Conformance extends api.Conformance {
     }
 
     override def visitCompoundType(c: ScCompoundType) {
-      handler.foreach { h =>
-        h.visit("visitCompoundType - skip")
-      }
+      handler.foreach(_.visit("visitCompoundType - skip"))
       var rightVisitor: ScalaTypeVisitor =
         new ValDesignatorSimplification with UndefinedSubstVisitor with AbstractVisitor
           with ParameterizedAbstractVisitor {}
