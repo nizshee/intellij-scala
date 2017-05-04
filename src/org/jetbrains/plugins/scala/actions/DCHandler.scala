@@ -2,7 +2,7 @@ package org.jetbrains.plugins.scala.actions
 
 import com.intellij.psi.PsiNamedElement
 import org.jetbrains.plugins.scala.lang.psi.types.api.{Any, Nothing, UndefinedType}
-import org.jetbrains.plugins.scala.lang.psi.types.{ScType, ScUndefinedSubstitutor}
+import org.jetbrains.plugins.scala.lang.psi.types.{ScCompoundType, ScType, ScUndefinedSubstitutor, Signature, TypeAliasSignature}
 import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
 
 /**
@@ -20,8 +20,32 @@ object DCHandler {
 
   class Conformance(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug) {
 
+    private var _compound: Option[ConformanceCondition.CompoundLeft] = None
     private var _conditions: Seq[ConformanceCondition] = Seq()
     private var _variances: Seq[ConformanceCondition.Variance] = Seq()
+
+    def addCompound(compound: ScCompoundType, right: ScType): Unit = _compound =
+      Some(ConformanceCondition.CompoundLeft(compound, right, Map(), Map(), Seq()))
+
+    def addAlias(name: String, sign: TypeAliasSignature, el: PsiNamedElement): Unit = _compound match {
+      case Some(x) => _compound = Some(x.copy(aliases = x.aliases.updated(name -> sign, el)))
+      case None =>
+    }
+
+    def addSignature(sign: Signature, ty: ScType, el: PsiNamedElement): Unit = _compound match {
+      case Some(x) => _compound = Some(x.copy(signatures = x.signatures.updated(sign -> ty, el)))
+      case None =>
+    }
+
+    def addRelation(conformance: Relation.Conformance): Unit = _compound match {
+      case Some(x) => _compound = Some(x.copy(relations = x.relations :+ conformance))
+      case None =>
+    }
+
+    def commitCompound(): Unit = _compound match {
+      case Some(x) => this + x
+      case None =>
+    }
 
     def +(condition: ConformanceCondition): ConformanceCondition = {
       _conditions :+= condition

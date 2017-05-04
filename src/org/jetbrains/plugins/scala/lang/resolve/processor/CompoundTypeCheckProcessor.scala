@@ -1,7 +1,7 @@
 package org.jetbrains.plugins.scala.lang.resolve.processor
 
 import com.intellij.psi._
-import org.jetbrains.plugins.scala.actions.DCHandler
+import org.jetbrains.plugins.scala.actions.{ConformanceCondition, DCHandler}
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScFieldId
 import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.ScBindingPattern
@@ -137,20 +137,25 @@ class CompoundTypeCheckSignatureProcessor(s: Signature, retType: ScType,
           case param: ScParameter => param.getType(TypingContext.empty).getOrNothing
         })
         val dcl: ScTypedDefinition = element.asInstanceOf[ScTypedDefinition]
-        handler.foreach(_.log("!!!" + (dcl.getParent match {
-          case e: PsiNamedElement => e.name
-          case _ => "undefined"
-        })))
         val isVar = dcl.isVar
-        if (!checkSignature(new Signature(dcl.name, Seq.empty, 0, subst, dcl), Array.empty, rt)) return false
+        if (!checkSignature(new Signature(dcl.name, Seq.empty, 0, subst, dcl), Array.empty, rt)) {
+          handler.foreach(_.addSignature(s, retType, namedElement))
+          return false
+        }
         if (isVar && !checkSignature(new Signature(dcl.name + "_=", Seq(() => rt), 1, subst, dcl),
-          Array.empty, Unit)) return false
+          Array.empty, Unit)) {
+          handler.foreach(_.addSignature(s, retType, namedElement))
+          return false
+        }
       case method: PsiMethod =>
         val sign1 = new PhysicalSignature(method, subst)
         if (!checkSignature(sign1, method.getTypeParameters, method match {
           case fun: ScFunction => fun.returnType.getOrNothing
           case method: PsiMethod => method.getReturnType.toScType()
-        })) return false
+        })) {
+          handler.foreach(_.addSignature(s, retType, namedElement))
+          return false
+        }
       case _ =>
     }
     true
@@ -265,12 +270,19 @@ class CompoundTypeCheckTypeAliasProcessor(sign: TypeAliasSignature, undefSubst: 
               undef = t._2
               trueResult = true
               innerUndefinedSubstitutor = undef
+              handler.foreach(_.addAlias(sign.name, sign, namedElement))
               return false
             }
-          case _: ScTypeAliasDeclaration => if (checkDeclarationForTypeAlias(tp)) return false
+          case _: ScTypeAliasDeclaration => if (checkDeclarationForTypeAlias(tp)) {
+            handler.foreach(_.addAlias(sign.name, sign, namedElement))
+            return false
+          }
           case _ =>
         }
-      case tp: ScTypeAliasDeclaration => if (checkDeclarationForTypeAlias(tp)) return false
+      case tp: ScTypeAliasDeclaration => if (checkDeclarationForTypeAlias(tp)) {
+        handler.foreach(_.addAlias(sign.name, sign, namedElement))
+        return false
+      }
       case _ =>
     }
     true

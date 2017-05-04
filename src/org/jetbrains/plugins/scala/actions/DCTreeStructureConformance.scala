@@ -2,10 +2,12 @@ package org.jetbrains.plugins.scala.actions
 
 import java.util
 
-import com.intellij.ide.projectView.PresentationData
+import com.intellij.ide.projectView.{PresentationData, ViewSettings}
+import com.intellij.ide.projectView.impl.nodes.AbstractPsiBasedNode
 import com.intellij.ide.util.treeView.{AbstractTreeNode, AbstractTreeStructure, NodeDescriptor}
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
+import com.intellij.psi.{PsiElement, PsiNamedElement}
 
 
 
@@ -51,6 +53,7 @@ object DCTreeStructureConformance {
 
   case class RelationValue(v: Relation, prefix: String = "")
   case class ConditionValue(v: ConformanceCondition, prefix: String = "")
+  case class ElementValue(name: String, namedElement: Option[PsiNamedElement])
 
   class RelationNode(relation: RelationValue)(implicit project: Project) extends AbstractTreeNode[RelationValue](project, relation) {
 
@@ -71,10 +74,10 @@ object DCTreeStructureConformance {
       relation.v match {
         case r: Relation.Equivalence =>
           presentationData.setPresentableText((if (relation.prefix.nonEmpty) relation.prefix + ": " else "") +
-            s"${r.left} =: ${r.right}")
+            s"${r.right} =: ${r.left}")
         case r: Relation.Conformance =>
           presentationData.setPresentableText((if (relation.prefix.nonEmpty) relation.prefix + ": " else "") +
-            s"${r.left} >: ${r.right}")
+            s"${r.right} <: ${r.left}")
       }
       if (!relation.v.satisfy)
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
@@ -110,6 +113,19 @@ object DCTreeStructureConformance {
           c.args.foreach(c => list.add(new RelationNode(RelationValue(c.relation, "arg"))))
         case c: ConformanceCondition.CompoundRight =>
           c.relations.foreach(c => list.add(new RelationNode(RelationValue(c))))
+        case c: ConformanceCondition.CompoundLeft =>
+          c.relations.foreach(c => list.add(new RelationNode(RelationValue(c))))
+          c.left.signatureMap.foreach { case (sign, ty) =>
+            val name = s"exists ${sign.name}: $ty" // TODO? function signatures
+            list.add(new ElementNode(ElementValue(name, c.signatures.get(sign -> ty))))
+          }
+          c.left.typesMap.foreach { case (n, sign) =>
+            val params = if (sign.typeParams.nonEmpty) s"[${sign.typeParams.mkString(", ")}]" else ""
+            val name = s"exists type ${sign.name}$params <: ${sign.upperBound} >: ${sign.lowerBound}"
+            list.add(new ElementNode(ElementValue(name, c.aliases.get(n -> sign))))
+          }
+        case c: ConformanceCondition.ExistentialRight =>
+          list.add(new RelationNode(RelationValue(c.conformance)))
         case _ =>
       }
       list
@@ -145,13 +161,46 @@ object DCTreeStructureConformance {
           s"${c.left} >: ${c.right} [restriction]"
         case c: ConformanceCondition.CompoundRight =>
           s"if exists at least one"
+        case c: ConformanceCondition.CompoundLeft =>
+          s"if all"
+        case c: ConformanceCondition.ExistentialRight =>
+          s"if skolemization conforms"
         case _ =>
       }
       val msg = condition.v.msg
+      val tip =
+        """If T<:UiT<:Ui for i∈1,…,ni∈1,…,n and for every binding dd of a type or value xx in RR there exists a member binding of xx in TT which subsumes dd, then TT conforms to the compound type U1U1 with …… with UnUn {RR}."""
+      presentationData.setTooltip(tip)
       presentationData.setPresentableText(s"$data" + (if (msg.nonEmpty) "//" else "") + msg)
       if (!condition.v.satisfy)
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
   }
+
+  class ElementNode(value: ElementValue)(implicit project: Project) extends AbstractTreeNode[ElementValue](project, value) {
+
+    override def getChildren: util.Collection[AbstractTreeNode[_]] = {
+      val list = new util.ArrayList[AbstractTreeNode[_]]()
+      value.namedElement.foreach(a => list.add(new ActualElementNode(a)))
+      list
+    }
+
+    override def update(presentationData: PresentationData): Unit = {
+      presentationData.setPresentableText(value.name)
+      if (value.namedElement.isEmpty)
+        presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
+    }
+  }
+
+  class ActualElementNode(namedElement: PsiNamedElement)(implicit project: Project) extends AbstractPsiBasedNode[PsiNamedElement](project, namedElement, ViewSettings.DEFAULT) {
+    override def extractPsiFromValue(): PsiElement = namedElement
+
+    override def getChildrenImpl: util.Collection[AbstractTreeNode[_]] = new util.ArrayList[AbstractTreeNode[_]]()
+
+    override def updateImpl(presentationData: PresentationData): Unit = {
+      presentationData.setPresentableText(namedElement.toString)
+    }
+  }
+
 
 }

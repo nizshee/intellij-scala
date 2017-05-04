@@ -334,10 +334,7 @@ object Conformance extends api.Conformance {
 
     trait ParameterizedAbstractVisitor extends ScalaTypeVisitor {
       override def visitParameterizedType(p: ParameterizedType) {
-        handler.foreach { h =>
-          h.log(p.designator, p.typeArguments)
-          h.rvisit("ParameterizedAbstractVisitor - ??? (why not upper bound)")
-        }
+        handler.foreach(_.rvisit(s"ParameterizedAbstractVisitor (${p.designator}, ${p.typeArguments}) - ??? (why not upper bound)"))
         p.designator match {
           case ScAbstractType(parameterType, lowerBound, _) =>
             val subst = ScSubstitutor(parameterType.arguments.zip(p.typeArguments).map {
@@ -364,37 +361,44 @@ object Conformance extends api.Conformance {
       }
     }
 
-    trait ExistentialSimplification extends ScalaTypeVisitor { // TODO ???? simplifies existential
+    trait ExistentialSimplification extends ScalaTypeVisitor {
       override def visitExistentialType(e: ScExistentialType) {
-        handler.foreach { h =>
-          h.rvisit("ExistentialSimplification - skip")
-        }
+        handler.foreach(_.rvisit("ExistentialSimplification - ok"))
         val simplified = e.simplify()
-        if (simplified != r) result = conformsInner(l, simplified, visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
+        if (simplified != r) {
+          val inner = handler.map(_.inner)
+          result = conformsInner(l, simplified, visited, undefinedSubst, checkWeak, handler = inner)
+          handler.foreach(_ + ConformanceCondition.ExistentialRight(l, e, Relation.Conformance(l, simplified, inner.get.conditions)))
+        }
       }
     }
 
     trait ExistentialArgumentVisitor extends ScalaTypeVisitor {
       override def visitExistentialArgument(s: ScExistentialArgument): Unit = {
-        handler.foreach { h =>
-          h.rvisit("ExistentialArgumentVisitor - skip")
-        }
-        result = conformsInner(l, s.upper, HashSet.empty, undefinedSubst, handler = handler.map(_.inner))
+        handler.foreach(_.rvisit("ExistentialArgumentVisitor - ok"))
+        val inner = handler.map(_.inner)
+        result = conformsInner(l, s.upper, HashSet.empty, undefinedSubst, handler = inner)
+        handler.foreach(_ + ConformanceCondition.Transitive(l, s.upper, s, Relation.Conformance(l, s.upper, inner.get.conditions),
+          Relation.Conformance(s.upper, s, Seq(ConformanceCondition.TypeUpper(s.upper, s, satisfy = true)))))
       }
     }
 
     trait ParameterizedExistentialArgumentVisitor extends ScalaTypeVisitor {
       override def visitParameterizedType(p: ParameterizedType) {
-        handler.foreach { h =>
-          h.rvisit("ParameterizedExistentialArgumentVisitor - skip")
-        }
+        handler.foreach(_.rvisit(s"ParameterizedExistentialArgumentVisitor - ok"))
         p.designator match {
           case s: ScExistentialArgument =>
             s.upper match {
               case ParameterizedType(upper, _) =>
-                result = conformsInner(l, upper, visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
+                val inner = handler.map(_.inner)
+                result = conformsInner(l, upper, visited, undefinedSubst, checkWeak, handler = inner) // TODO? example
+                handler.foreach(_ + ConformanceCondition.Transitive(l, upper, p, Relation.Conformance(l, upper, inner.get.conditions),
+                  Relation.Conformance(upper, p, Seq(ConformanceCondition.TypeUpper(upper, p, satisfy = true)))))
               case upper =>
-                result = conformsInner(l, upper, visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
+                val inner = handler.map(_.inner)
+                result = conformsInner(l, upper, visited, undefinedSubst, checkWeak, handler = inner) // TODO? example
+                handler.foreach(_ + ConformanceCondition.Transitive(l, upper, p, Relation.Conformance(l, upper, inner.get.conditions),
+                  Relation.Conformance(upper, p, Seq(ConformanceCondition.TypeUpper(upper, p, satisfy = true)))))
             }
           case _ =>
         }
@@ -403,22 +407,22 @@ object Conformance extends api.Conformance {
 
     trait OtherNonvalueTypesVisitor extends ScalaTypeVisitor {
       override def visitUndefinedType(u: UndefinedType) {
-        handler.foreach(_.rvisit("OtherNonvalueTypes - undefined - skip"))
+        handler.foreach(_.rvisit("OtherNonvalueTypes - undefined - ok"))
         result = (false, undefinedSubst)
       }
 
       override def visitMethodType(m: ScMethodType) {
-        handler.foreach(_.rvisit("OtherNonvalueTypes - method - skip"))
+        handler.foreach(_.rvisit("OtherNonvalueTypes - method - ok"))
         result = (false, undefinedSubst)
       }
 
       override def visitAbstractType(a: ScAbstractType) {
-        handler.foreach(_.rvisit("OtherNonvalueTypes - abstract - skip"))
+        handler.foreach(_.rvisit("OtherNonvalueTypes - abstract - ok"))
         result = (false, undefinedSubst)
       }
 
       override def visitTypePolymorphicType(t: ScTypePolymorphicType) {
-        handler.foreach(_.rvisit("OtherNonvalueTypes - typePolymorphic - skip"))
+        handler.foreach(_.rvisit("OtherNonvalueTypes - typePolymorphic - ok"))
         result = (false, undefinedSubst)
       }
     }
@@ -649,7 +653,9 @@ object Conformance extends api.Conformance {
     trait ExistentialVisitor extends ScalaTypeVisitor {
       override def visitExistentialType(ex: ScExistentialType) {
         handler.foreach(_.rvisit("ExistentialVisitor - skip"))
-        result = conformsInner(l, ex.quantified, HashSet.empty, undefinedSubst, handler = handler.map(_.inner))
+        val inner = handler.map(_.inner)
+        result = conformsInner(l, ex.quantified, HashSet.empty, undefinedSubst, handler = inner)
+
       }
     }
 
@@ -684,9 +690,7 @@ object Conformance extends api.Conformance {
                   h + ConformanceCondition.Projection(Relation.Conformance(projected1, projected2, inner.get.conditions))
                 }
               case param@ParameterizedType(projDes: ScProjectionType, _) =>
-                handler.foreach { h =>
-                  h.logn("left is parametrized type of projection and what next - todo")
-                }
+                handler.foreach(_.logn("left is parametrized type of projection and what next - todo"))
                 //TODO this looks overcomplicated. Improve the code.
                 def cutProj(p: ScType, acc: List[ScProjectionType]): ScType = {
                   if (acc.isEmpty) p else acc.foldLeft(p){
@@ -909,7 +913,7 @@ object Conformance extends api.Conformance {
     }
 
     override def visitCompoundType(c: ScCompoundType) {
-      handler.foreach(_.visit("visitCompoundType - todo"))
+      handler.foreach(_.visit("visitCompoundType - ok"))
       var rightVisitor: ScalaTypeVisitor =
         new ValDesignatorSimplification with UndefinedSubstVisitor with AbstractVisitor
           with ParameterizedAbstractVisitor {}
@@ -950,15 +954,21 @@ object Conformance extends api.Conformance {
         processor.getResult
       }
 
+      handler.foreach(_.addCompound(c, r))
       result = (c.components.forall(comp => {
-        val t = conformsInner(comp, r, HashSet.empty, undefinedSubst, handler = handler.map(_.inner))
+        val inner = handler.map(_.inner)
+        val t = conformsInner(comp, r, HashSet.empty, undefinedSubst, handler = inner)
+        handler.foreach(_.addRelation(Relation.Conformance(comp, r, inner.get.conditions)))
         undefinedSubst = t._2
-        t._1
+        t._1 || handler.nonEmpty
       }) && c.signatureMap.forall {
-        case (s: Signature, retType) => workWithSignature(s, retType)
+        case (s: Signature, retType) =>
+          workWithSignature(s, retType) || handler.nonEmpty
       } && c.typesMap.forall {
-        case (_, sign) => workWithTypeAlias(sign)
+        case (_, sign) =>
+          workWithTypeAlias(sign) || handler.nonEmpty
       }, undefinedSubst)
+      handler.foreach(_.commitCompound())
     }
 
     override def visitProjectionType(proj: ScProjectionType) {
@@ -1190,7 +1200,7 @@ object Conformance extends api.Conformance {
     override def visitParameterizedType(p: ParameterizedType) {
       handler.foreach { h =>
         h.log(p.designator.isValue, p.typeArguments)
-        h.visit("visitParameterizedType")
+        h.visit("visitParameterizedType - ???")
       }
 
       var rightVisitor: ScalaTypeVisitor =
@@ -1201,6 +1211,7 @@ object Conformance extends api.Conformance {
 
       p.designator match {
         case a: ScAbstractType =>
+          handler.foreach(_.log("abstractType - skip"))
           val subst = ScSubstitutor(a.parameterType.arguments.zip(p.typeArguments).map {
             case (tpt: TypeParameterType, tp: ScType) => (tpt.nameAndId, tp)
           }.toMap)
@@ -1246,9 +1257,7 @@ object Conformance extends api.Conformance {
 
       p.designator match {
         case s: ScExistentialArgument =>
-          handler.foreach { h =>
-            h.logn("existential argument - skip")
-          }
+          handler.foreach(_.logn("existential argument - skip"))
           s.lower match {
             case ParameterizedType(lower, _) =>
               result = conformsInner(lower, r, visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
@@ -1364,9 +1373,7 @@ object Conformance extends api.Conformance {
                 }
               }
             case (_: UndefinedType, UndefinedType(parameterType, _)) =>
-              handler.foreach { h =>
-                h.logn("undefined types - skip now")
-              }
+              handler.foreach(_.logn("undefined types - skip now"))
               (if (args1.length != args2.length) findDiffLengthArgs(l, args2.length) else Some((args1, des1))) match {
                 case Some((aArgs, aType)) =>
                   undefinedSubst = undefinedSubst.addUpper(parameterType.nameAndId, aType)
@@ -1562,9 +1569,7 @@ object Conformance extends api.Conformance {
     }
 
     override def visitExistentialType(e: ScExistentialType) {
-      handler.foreach { h =>
-        h.visit("visitExistentialType - skip")
-      }
+      handler.foreach(_.visit("visitExistentialType - skip"))
       var rightVisitor: ScalaTypeVisitor =
         new ValDesignatorSimplification with UndefinedSubstVisitor
           with AbstractVisitor

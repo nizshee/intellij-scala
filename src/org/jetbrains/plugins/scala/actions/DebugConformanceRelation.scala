@@ -1,8 +1,9 @@
 package org.jetbrains.plugins.scala.actions
 
+import com.intellij.psi.PsiNamedElement
 import org.jetbrains.plugins.scala.lang.psi.types.api.{ParameterizedType, UndefinedType}
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.ScMethodType
-import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScCompoundType, ScType}
+import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScCompoundType, ScExistentialArgument, ScExistentialType, ScType, Signature, TypeAliasSignature}
 
 
 sealed trait ConformanceCondition {
@@ -29,7 +30,7 @@ object ConformanceCondition {
   }
 
 
-  case class Same(equiv: Relation.Equivalence, relation: Relation.Conformance) extends ConformanceCondition {
+  case class Same(equiv: Relation.Equivalence, relation: Relation.Conformance) extends ConformanceCondition { // TODO? remove
     override def satisfy: Boolean = equiv.satisfy && relation.satisfy
   }
 
@@ -79,16 +80,21 @@ object ConformanceCondition {
     override def satisfy: Boolean = true
   }
 
-  case class UndefinedLower(left: UndefinedType, right: UndefinedType) extends ConformanceCondition {
-    override def satisfy: Boolean = true // TODO? was ???, why?
-  }
-
   case class CompoundRight(left: ScType, right: ScCompoundType, relations: Seq[Relation.Conformance]) extends ConformanceCondition {
     override def satisfy: Boolean = relations.exists(_.satisfy)
   }
 
-  case class CompoundLeft(left: ScCompoundType, right: ScCompoundType, relations: Seq[Relation.Conformance]) extends ConformanceCondition {
-    override def satisfy: Boolean = relations.forall(_.satisfy)
+  case class CompoundLeft(left: ScCompoundType, right: ScType,
+                          signatures: Map[(Signature, ScType), PsiNamedElement],
+                          aliases: Map[(String, TypeAliasSignature), PsiNamedElement],
+                          relations: Seq[Relation.Conformance]) extends ConformanceCondition {
+    override def satisfy: Boolean = relations.forall(_.satisfy) &&
+      left.signatureMap.forall(signatures.get(_).nonEmpty) &&
+      left.typesMap.forall(aliases.get(_).nonEmpty)
+  }
+
+  case class ExistentialRight(left: ScType, right: ScExistentialType, conformance: Relation.Conformance) extends ConformanceCondition {
+    override def satisfy: Boolean = conformance.satisfy
   }
 
 }

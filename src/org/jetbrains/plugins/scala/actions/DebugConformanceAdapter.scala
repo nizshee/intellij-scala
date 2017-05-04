@@ -2,13 +2,17 @@ package org.jetbrains.plugins.scala.actions
 
 import org.jetbrains.plugins.scala.actions.ConformanceCondition._
 import org.jetbrains.plugins.scala.actions.Relation.{Conformance, Equivalence}
+import org.jetbrains.plugins.scala.lang.psi.types.ScalaTypeSystem
+import org.jetbrains.plugins.scala.lang.psi.types.api.TypeSystem
 
 
 object DebugConformanceAdapter {
 
+  implicit val typeSystem: TypeSystem = ScalaTypeSystem
+
   def adaptConditions(condition: ConformanceCondition): Seq[ConformanceCondition] = condition match {
-    case Transitive(l, m, _, _, mr) if l == m => mr.conditions
-    case Transitive(_, m, r, lm, _) if m == r => lm.conditions
+    case Transitive(l, m, _, _, mr) if l.equiv(m) => mr.conditions
+    case Transitive(_, m, r, lm, _) if m.equiv(r) => lm.conditions
     case _ => Seq(condition)
   }
 
@@ -24,6 +28,11 @@ object DebugConformanceAdapter {
           case Covariant(param, relation) => Covariant(param, apply(relation))
           case i => i
         })
+      case ExistentialRight(left, right, conformance) =>
+        ExistentialRight(left, right, apply(conformance))
+      case CompoundLeft(left, right, signatures, aliases, relations) =>
+        CompoundLeft(left, right, signatures, aliases, relations.map(apply))
+      case CompoundRight(left, right, relations) => CompoundRight(left, right, relations.map(apply))
       case c => c
     }
     r.copy(conditions = nConditions)
