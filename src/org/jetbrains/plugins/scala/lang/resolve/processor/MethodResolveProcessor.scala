@@ -157,7 +157,7 @@ class MethodResolveProcessor(override val ref: PsiElement,
     }
     if (!isShapeResolve && enableTupling && argumentClauses.nonEmpty) {
       isShapeResolve = true
-      val cand1 = MethodResolveProcessor.candidates(this, input, handler = handler)
+      val cand1 = MethodResolveProcessor.candidates(this, input)
       handler.foreach(_.log(s"candidates afrer shape resolve $cand1"))
       if (!isDynamic && (cand1.isEmpty || cand1.forall(_.tuplingUsed))) {
         handler.foreach(_.log("shape resolve gives nothing && tupling case - skip"))
@@ -247,6 +247,11 @@ object MethodResolveProcessor {
             substitutor.subst(rt.toScType())
           }.getOrElse(Nothing)
         case _ => Nothing
+      }
+      handler.foreach { h =>
+        val cHandler = handler.map(_.conformance)
+        val (_, subs) = Conformance.conformsInner(expected, retType, handler = cHandler)
+        if (!expected.equiv(api.Unit)) h + h.Ret(expected, retType, cHandler.get.conditions, subs)
       }
       if (!retType.conforms(expected) && !expected.equiv(api.Unit)) {
         problems += ExpectedTypeMismatch
@@ -413,11 +418,12 @@ object MethodResolveProcessor {
           val cHandler = handler.map(_.compatibility)
           val result =
             Compatibility.compatible(tp.asInstanceOf[PsiNamedElement], substitutor, args, checkWithImplicits,
-              ref.getResolveScope, isShapeResolve, ref, handler = cHandler) // TODO? where we check substitutor has solutions?
+              ref.getResolveScope, isShapeResolve, ref, handler = cHandler)
           handler.foreach(_ + cHandler.get.args)
           problems ++= result.problems
           addExpectedTypeProblems()
-          result.copy(problems)
+          if (handler.nonEmpty) result.copy(problems = problems, undefSubst = result.undefSubst + handler.get.subst)
+          else result.copy(problems)
         }
       case tp: PsiTypeParameterListOwner with PsiNamedElement =>
         handler.foreach(_.log("PsiTypeParameterListOwner - skip"))
@@ -450,11 +456,11 @@ object MethodResolveProcessor {
     }
 
     if (result.problems.forall(_ == ExpectedTypeMismatch)) {
-      val inner = handler.map(_.substitutor)
+      val inner1 = handler.map(_.substitutor)
       var uSubst = result.undefSubst
-      uSubst.getSubstitutor(notNonable = false, handler = inner) match {
+      uSubst.getSubstitutor(notNonable = false, handler = inner1) match {
         case None =>
-          handler.foreach(_.addRestrictions(inner.get.restictions))
+          handler.foreach(_.addRestrictions(inner1.get.result))
           result.copy(problems = Seq(WrongTypeParameterInferred))
         case Some(unSubst) =>
           def hasRecursiveTypeParameters(typez: ScType): Boolean = {
@@ -489,11 +495,10 @@ object MethodResolveProcessor {
           val inner = handler.map(_.substitutor)
           uSubst.getSubstitutor(notNonable = false, handler = inner) match {
             case Some(_) =>
-              handler.foreach(_.addRestrictions(inner.get.restictions))
+              handler.foreach(_.addRestrictions(inner.get.result))
               result
             case _ =>
-              handler.foreach(_.log("???" + inner.get.restictions))
-              handler.foreach(_.addRestrictions(inner.get.restictions))
+              handler.foreach(_.addRestrictions(inner.get.result))
               result.copy(problems = Seq(WrongTypeParameterInferred))
           }
       }
@@ -527,7 +532,8 @@ object MethodResolveProcessor {
   }
 
   @uninstrumental("handler")
-  def candidates(proc: MethodResolveProcessor, _input: Set[ScalaResolveResult], handler: Option[DCHandler.Resolver]): Set[ScalaResolveResult] = {
+  def candidates(proc: MethodResolveProcessor, _input: Set[ScalaResolveResult],
+                 handler: Option[DCHandler.Resolver] = None): Set[ScalaResolveResult] = {
     import proc._
 
     //We want to leave only fields and properties from inherited classes, this is important, because

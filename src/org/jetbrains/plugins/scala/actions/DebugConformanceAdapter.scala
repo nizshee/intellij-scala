@@ -18,7 +18,6 @@ object DebugConformanceAdapter {
 
   def apply(r: Relation.Conformance): Relation.Conformance = {
     val nConditions = r.conditions.flatMap(adaptConditions).map {
-      case Same(equiv, relation) => Same(equiv, apply(relation))
       case Projection(conforms) => Projection(apply(conforms))
       case Transitive(left, middle, right, lm, mr) =>
         Transitive(left, middle, right, apply(lm), apply(mr))
@@ -37,4 +36,6 @@ object DebugConformanceAdapter {
     }
     r.copy(conditions = nConditions)
   }
+
+//  def apply(r: Relation.Conformance): Relation.Conformance = r
 }

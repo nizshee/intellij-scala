@@ -30,7 +30,7 @@ trait Conformance extends TypeSystemOwner {
     * val x: l = (y: r)
     */
   @uninstrumental("handler")
-  final def conformsInner(left: ScType, right: ScType, // TODO?
+  final def conformsInner(left: ScType, right: ScType,
                           visited: Set[PsiClass] = Set.empty,
                           substitutor: ScUndefinedSubstitutor = ScUndefinedSubstitutor(),
                           checkWeak: Boolean = false, handler: Option[DCHandler.Conformance] = None): Result = {

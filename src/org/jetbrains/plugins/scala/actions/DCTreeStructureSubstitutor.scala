@@ -15,13 +15,14 @@ import scala.util.{Left, Right}
   * Created by user on 4/12/17.
   */
 object DCTreeStructureSubstitutor {
-  case class SubstitutorValue(restrictions: Seq[DCHandler.Substitutor#Restriction])
+  case class SubstitutorValue(restrictions: Seq[Seq[DCHandler.Substitutor#Restriction]])
   case class TypeVariableValue(restriction: DCHandler.Substitutor#Restriction)
   case class RestrictionValue(v: Either[ScType, ScType])
 
   class SubstitutorNode(value: SubstitutorValue)(implicit project: Project) extends AbstractTreeNode[SubstitutorValue](project, value) {
     private val restrictions = {
-      value.restrictions.map(r => new TypeVariableNode(TypeVariableValue(r)))
+      if (value.restrictions.size == 1) value.restrictions.head.map(r => new TypeVariableNode(TypeVariableValue(r)))
+      else value.restrictions.map(r => new SubstitutorNode(SubstitutorValue(Seq(r))))
     }
 
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
@@ -31,8 +32,12 @@ object DCTreeStructureSubstitutor {
     }
 
     override def update(presentationData: PresentationData): Unit = {
-      presentationData.setPresentableText("restrictions")
-      if (value.restrictions.exists(_.`type`.isEmpty))
+      if (value.restrictions.size == 1) presentationData.setPresentableText("restrictions")
+      else presentationData.setPresentableText("variants")
+
+      if (value.restrictions.size == 1 && value.restrictions.head.exists(_.`type`.isEmpty))
+        presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
+      else if (value.restrictions.forall(_.exists(_.`type`.isEmpty)))
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
   }

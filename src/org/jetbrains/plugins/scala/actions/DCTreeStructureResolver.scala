@@ -27,7 +27,7 @@ class DCTreeStructureResolver(values: Seq[DCTreeStructureResolver.Value])(implic
   private class RootNode extends AbstractTreeNode[Any](project, ()) {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
-      values.foreach { value => list.add(new CandidateNode(CandidateValue(value.el, value.candidate))) }
+      values.foreach { value => list.add(new CandidateNode(CandidateValue(value.el, value.candidate, value.ret))) }
       list
     }
 
@@ -39,7 +39,7 @@ class DCTreeStructureResolver(values: Seq[DCTreeStructureResolver.Value])(implic
   override def getRootElement: AnyRef = new RootNode
 
   override def getChildElements(o: scala.Any): Array[AnyRef] = o match {
-    case _: RootNode => values.map(v =>  new CandidateNode(CandidateValue(v.el, v.candidate))).toArray
+    case _: RootNode => values.map(v =>  new CandidateNode(CandidateValue(v.el, v.candidate, v.ret))).toArray
     case n: CandidateNode =>
       val children = n.getChildren
       children.toArray(new Array[AnyRef](children.size))
@@ -111,18 +111,18 @@ object DCTreeStructureResolver {
     case _ => "unknown"
   }
 
-  case class Value(el: PsiNamedElement, candidate: DCHandler.Resolver#Candidate, prefix: String = "")
-  case class CandidateValue(el: PsiNamedElement, candidate: DCHandler.Resolver#Candidate)
+  case class Value(el: PsiNamedElement, candidate: DCHandler.Resolver#Candidate, ret: Option[DCHandler.Resolver#Ret], prefix: String = "")
+  case class CandidateValue(el: PsiNamedElement, candidate: DCHandler.Resolver#Candidate, ret: Option[DCHandler.Resolver#Ret])
   case class WeightsValue(weights: Map[PsiNamedElement, DCHandler.Resolver#Weight])
   case class WeightValue(el: PsiNamedElement, weight: DCHandler.Resolver#Weight)
 
   class CandidateNode(value: CandidateValue)(implicit project: Project) extends AbstractPsiBasedNode[CandidateValue](project, value, ViewSettings.DEFAULT) {
     private val greaterWeight = value.candidate.weights.values.forall(w => w.v > w.opposite)
-    private val restictionsHaveSolution = value.candidate.restrictions.forall(_.`type`.nonEmpty)
+    private val restictionsHaveSolution = value.candidate.restrictions.exists(_.forall(_.`type`.nonEmpty)) || value.candidate.restrictions.isEmpty
     private val conditionsExists = value.candidate.args.forall(_.conditions.exists(_.satisfy))
     private val weights = Some(value.candidate.weights).filter(_.nonEmpty).map(w => new WeightNode(WeightsValue(w)))
-    private val compatibility = Some(value.candidate.args).filter(_.nonEmpty).map(a => new CompatibilityNode(CompatibilityValue(a)))
-    private val restrictions = Some(value.candidate.restrictions).filter(_.nonEmpty).map(r => new SubstitutorNode(SubstitutorValue(r)))
+    private val compatibility = Some(value.candidate.args).filter(_.nonEmpty).map(a => new CompatibilityNode(CompatibilityValue(a, value.ret)))
+    private val restrictions = Some(value.candidate.restrictions).filter(_.exists(_.nonEmpty)).map(r => new SubstitutorNode(SubstitutorValue(r)))
 
     override def getChildrenImpl: util.Collection[AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()

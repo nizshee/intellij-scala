@@ -32,7 +32,7 @@ import scala.collection.mutable.ArrayBuffer
   * User: Alexander Podkhalyuzin
   * Date: 26.04.2010
   */
-@uninstrumental("handler", debug = true)
+@uninstrumental("handler")
 case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHandler.Resolver] = None)
                            (implicit typeSystem: TypeSystem) {
   def mostSpecificForResolveResult(applicable: Set[ScalaResolveResult],
@@ -203,7 +203,7 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
             Compatibility.checkConformance(checkNames = false, params2, exprs, checkImplicits)
           case (Right(type1), Right(type2)) =>
             handler.foreach { h =>
-              val inner = handler.map(_.conforemance)
+              val inner = handler.map(_.conformance)
               Conformance.conformsInner(type2, type1, handler = inner)
               conf = Some(Right(inner.get.conditions))
             }
@@ -262,8 +262,10 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
         handler.foreach { h =>
           conf.get match {
             case Left(args) =>
-              h.addWeight(r1.element, r2.element, AsSpecificAsCondition.Method(t1, t2, args))
-            case _ => // TODO
+              val inner = handler.map(_.substitutor)
+              u.getSubstitutorWithBounds(notNonable = false, handler = inner)
+              h.addWeight(r1.element, r2.element, AsSpecificAsCondition.Method(t1, t2, args, inner.get.result))
+            case _ => // TODO?
           }
         }
         u.getSubstitutor.isDefined
@@ -274,7 +276,7 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
         val t1: ScType = getType(e1, r1.implicitCase)
         val t2: ScType = getType(e2, r2.implicitCase)
         handler.foreach { h =>
-          val inner = handler.map(_.conforemance)
+          val inner = handler.map(_.conformance)
           Conformance.conformsInner(t2, t1, handler = inner)
           h.addWeight(r1.element, r2.element, AsSpecificAsCondition.Conforms(t1, t2, inner.get.conditions))
         }

@@ -1,7 +1,7 @@
 package org.jetbrains.plugins.scala.lang.psi.types
 
 import org.jetbrains.plugins.dotty.lang.psi.types.DottyTypeSystem
-import org.jetbrains.plugins.scala.actions.{DCHandler, DebugConformanceAction}
+import org.jetbrains.plugins.scala.actions.DCHandler
 import org.jetbrains.plugins.scala.lang.psi.types.api._
 import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
 
@@ -363,7 +363,7 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
                       val seqIterator = set.iterator
                       while (seqIterator.hasNext) {
                         val upper = seqIterator.next()
-                        if (!lower.conforms(subst.subst(upper))) { // TODO? it is good that we calculated uType for this case
+                        if (!lower.conforms(subst.subst(upper))) {
                           handler.foreach(_.logn("!(lower <: uppers)"))
                           return None
                         }
@@ -371,7 +371,7 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
                     }
                   case None =>
                     handler.foreach(_.addType(uType))
-                    handler.foreach(_.logn(s"took lowest of upers $uType"))
+                    handler.foreach(_.logn(s"took lowest of uppers $uType"))
                     tvMap += ((name, uType))
                 }
               }
@@ -421,8 +421,16 @@ class ScMultiUndefinedSubstitutor(val subs: Seq[ScUndefinedSubstitutor]) extends
     copy(subs.map(_.addUpper(name, _upper, additional, variance)))
 
   @uninstrumental("handler")
-  override def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] =
-    subs.map(_.getSubstitutorWithBounds(notNonable)).find(_.isDefined).getOrElse(None)
+  override def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] = {
+    subs.map { sub =>
+      val inner = handler.map(_.inner)
+      val r = sub.getSubstitutorWithBounds(notNonable, inner)
+      handler.foreach { h =>
+        inner.get.result.foreach(r => h + r)
+      }
+      r
+    }.find(_.isDefined).getOrElse(None)
+  }
 
   override def filter(fun: (((String, Long), Set[ScType])) => Boolean): ScUndefinedSubstitutor =
     copy(subs.map(_.filter(fun)))

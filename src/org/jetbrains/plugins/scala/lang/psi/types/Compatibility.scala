@@ -212,7 +212,6 @@ object Compatibility {
     var matchedTypes: List[(Parameter, ScType)] = Nil
     var defaultParameterUsed = false
 
-    // TODO? a lot of cases for now only primary path - arguments without names
     def doNoNamed(expr: Expression): List[ApplicabilityProblem] = {
       if (namedMode) {
         List(PositionalAfterNamedArgument(expr.expr))
@@ -222,19 +221,19 @@ object Compatibility {
         used(getIt) = true
         val param: Parameter = parameters(getIt)
         val paramType = param.paramType
-        handler.foreach(_.log(s"doNoNamed for ${param.name}"))
         val expectedType = param.expectedType
+        handler.foreach(_.log(s"doNoNamed for ${param.name} expected $expectedType"))
         val typeResult =
-          expr.getTypeAfterImplicitConversion(checkWithImplicits, isShapesResolve, Some(expectedType))._1
+          expr.getTypeAfterImplicitConversion(checkWithImplicits, isShapesResolve, Some(expectedType).filter(_ => handler.isEmpty && true))._1
         typeResult.toOption match {
           case None => Nil
           case Some(exprType) =>
             handler.foreach { h =>
               h.log(s"find constaints to $exprType >: $paramType")
               val cHandler = handler.map(_.handler)
-              val (_, subst) = typeSystem.conformance.conformsInner(paramType, exprType,
+              typeSystem.conformance.conformsInner(paramType, exprType,
                 substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = cHandler)
-              h + h.Arg(param.name, exprType, paramType, subst,
+              h + h.Arg(param.name, exprType, paramType,
                 Relation.Conformance(exprType, paramType, cHandler.get.conditions).conditions)
             }
             val conforms = exprType.weakConforms(paramType) // TODO? calculates two times, i'll add third

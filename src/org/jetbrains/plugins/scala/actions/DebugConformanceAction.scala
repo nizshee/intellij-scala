@@ -106,7 +106,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     val popup: JBPopup = JBPopupFactory.getInstance().createComponentPopupBuilder(panel, jTree).
       setRequestFocus(true).
       setResizable(true).
-      setTitle("Debug Conformance:").
+      setTitle("Debug Types:").
       setMinSize(new Dimension(size.width + 500, size.height)).
       createPopup
 
@@ -210,7 +210,7 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
 //    ReferenceExpressionResolver.resolve(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
 
-    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2)) // TODO receives already shaped alternatives - magic
+    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2, handler.ret))
     println(values)
     showPopup(new DCTreeStructureResolver(values))
   }

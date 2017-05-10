@@ -139,52 +139,36 @@ object Conformance extends api.Conformance {
                                      visited: Set[PsiClass], checkWeak: Boolean, handler: Option[DCHandler.Conformance]): (Boolean, ScUndefinedSubstitutor) = {
     var undefinedSubst = _undefinedSubst
 
-    handler.foreach { h =>
-      h.log("checkParameterizedType")
-    }
+    handler.foreach(_.log("checkParameterizedType"))
 
     def addAbstract(upper: ScType, lower: ScType, tp: ScType, alternateTp: ScType): Boolean = { // TODO? how to fire
       if (!upper.equiv(Any)) {
-        handler.foreach { h =>
-          h.log("try to conform tp to upper - skip")
-        }
+        handler.foreach(_.log("try to conform tp to upper - skip"))
         val t = conformsInner(upper, tp, visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
         if (!t._1) {
-          handler.foreach { h =>
-            h.log("not success, try to conform alternateTp to upper")
-          }
+          handler.foreach(_.log("not success, try to conform alternateTp to upper"))
           val t = conformsInner(upper, alternateTp, visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
           if (!t._1) {
-            handler.foreach { h =>
-              h.logn("can't satisfy upper bound")
-            }
+            handler.foreach(_.logn("can't satisfy upper bound"))
             return false
           }
           else undefinedSubst = t._2
         } else undefinedSubst = t._2
       }
       if (!lower.equiv(Nothing)) {
-        handler.foreach { h =>
-          h.log("try to conform tp to lower")
-        }
+        handler.foreach(_.log("try to conform tp to lower"))
         val t = conformsInner(tp, lower, visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
         if (!t._1) {
-          handler.foreach { h =>
-            h.log("not success, try to conform alternateTp to lower")
-          }
+          handler.foreach(_.log("not success, try to conform alternateTp to lower"))
           val t = conformsInner(alternateTp, lower, visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
           if (!t._1) {
-            handler.foreach { h =>
-              h.logn("can't satisfy lower bound")
-            }
+            handler.foreach(_.logn("can't satisfy lower bound"))
             return false
           }
           else undefinedSubst = t._2
         } else undefinedSubst = t._2
       }
-      handler.foreach { h =>
-        h.logn("satisfy")
-      }
+      handler.foreach(_.logn("satisfy"))
       true
     }
 
@@ -202,41 +186,43 @@ object Conformance extends api.Conformance {
         case scp: ScTypeParam if scp.isContravariant =>
           val inner = handler.map(_.inner)
           val y = conformsInner(argsPair._2, argsPair._1, HashSet.empty, undefinedSubst, handler = inner)
-          handler.foreach { h =>
-            h + ConformanceCondition.Contrvariant(scp.name, Relation.Conformance(argsPair._2, argsPair._1, inner.get.conditions))
-          }
+          handler.foreach(_ + ConformanceCondition.Contrvariant(scp.name, Relation.Conformance(argsPair._2, argsPair._1,
+            inner.get.conditions)))
           if (!y._1 && handler.isEmpty) return (false, undefinedSubst)
           else undefinedSubst = y._2
         case scp: ScTypeParam if scp.isCovariant =>
           val inner = handler.map(_.inner)
           val y = conformsInner(argsPair._1, argsPair._2, HashSet.empty, undefinedSubst, handler = inner)
-          handler.foreach { h =>
-            h + ConformanceCondition.Covariant(scp.name, Relation.Conformance(argsPair._1, argsPair._2, inner.get.conditions))
-          }
+          handler.foreach(_ + ConformanceCondition.Covariant(scp.name, Relation.Conformance(argsPair._1, argsPair._2,
+            inner.get.conditions)))
           if (!y._1 && handler.isEmpty) return (false, undefinedSubst)
           undefinedSubst = y._2
         //this case filter out such cases like undefined type
         case _ =>
           argsPair match {
-            case (UndefinedType(parameterType, _), rt) => // TODO?
+            case (UndefinedType(parameterType, _), rt) =>
               val y = addParam(parameterType, rt, undefinedSubst, args2, args1, handler)
+              handler.foreach(_ + ConformanceCondition.Invariant(tp.name, Relation.Equivalence(argsPair._1, rt, satisfy = y._1), restriction = true))
               if (!y._1) {
                 return (false, undefinedSubst)
               }
               undefinedSubst = y._2
-            case (lt, UndefinedType(parameterType, _)) => // TODO?
+            case (lt, UndefinedType(parameterType, _)) =>
               val y = addParam(parameterType, lt, undefinedSubst, args1, args2, handler)
+              handler.foreach(_ + ConformanceCondition.Invariant(tp.name, Relation.Equivalence(lt, argsPair._2, satisfy = y._1), restriction = true))
               if (!y._1) {
                 return (false, undefinedSubst)
               }
               undefinedSubst = y._2
-            case (ScAbstractType(tpt, lower, upper), r) => // TODO?
+            case (ScAbstractType(tpt, lower, upper), r) =>
+              handler.foreach(_.log("ScAbstractType left - skip"))
               val (right, alternateRight) =
                 if (tpt.arguments.nonEmpty && !r.isInstanceOf[ScParameterizedType])
                   (ScParameterizedType(r, tpt.arguments), r)
                 else (r, r)
               if (!addAbstract(upper, lower, right, alternateRight)) return (false, undefinedSubst)
-            case (l, ScAbstractType(tpt, lower, upper)) => // TODO?
+            case (l, ScAbstractType(tpt, lower, upper)) =>
+              handler.foreach(_.log("ScAbstractType right - skip"))
               val (left, alternateLeft) =
                 if (tpt.arguments.nonEmpty && !l.isInstanceOf[ScParameterizedType])
                   (ScParameterizedType(l, tpt.arguments), l)
@@ -247,7 +233,7 @@ object Conformance extends api.Conformance {
               handler.foreach { h =>
                 h + ConformanceCondition.Invariant(tp.name, Relation.Equivalence(argsPair._1, argsPair._2, satisfy = t._1))
               }
-              if (!t._1 && handler.isEmpty) {
+              if (!t._1/* && handler.isEmpty*/) {
                 return (false, undefinedSubst)
               }
               undefinedSubst = t._2
@@ -305,9 +291,7 @@ object Conformance extends api.Conformance {
 
     trait AbstractVisitor extends ScalaTypeVisitor {
       override def visitAbstractType(a: ScAbstractType) {
-        handler.foreach { h =>
-          h.rvisit("AbstractVisitor - ok ??? (strange conditions)")
-        }
+        handler.foreach(_.rvisit(s"AbstractVisitor - ok ($a) (strange conditions)"))
         val left =
           if (a.parameterType.arguments.nonEmpty && !l.isInstanceOf[ScParameterizedType]) {
             ScParameterizedType(l, a.parameterType.arguments)
@@ -317,12 +301,12 @@ object Conformance extends api.Conformance {
           val inner = handler.map(_.inner)
           result = conformsInner(left, a.lower, visited, undefinedSubst, checkWeak, handler = inner)
           handler.foreach { h =>
-            h + ConformanceCondition.PolymorphicArgument(a, l, satisfy = result._1)
+            h + ConformanceCondition.Abstract(a, l, satisfy = result._1)
           }
         } else {
           result = (true, undefinedSubst)
           handler.foreach { h =>
-            h + ConformanceCondition.PolymorphicArgument(a, l, satisfy = true)
+            h + ConformanceCondition.Abstract(a, l, satisfy = true)
           }
         }
         if (result._1 && !a.upper.equiv(Any)) { // TODO? why is optionally?
@@ -334,7 +318,7 @@ object Conformance extends api.Conformance {
 
     trait ParameterizedAbstractVisitor extends ScalaTypeVisitor {
       override def visitParameterizedType(p: ParameterizedType) {
-        handler.foreach(_.rvisit(s"ParameterizedAbstractVisitor (${p.designator}, ${p.typeArguments}) - ??? (why not upper bound)"))
+        handler.foreach(_.rvisit(s"ParameterizedAbstractVisitor - skip (not common)"))
         p.designator match {
           case ScAbstractType(parameterType, lowerBound, _) =>
             val subst = ScSubstitutor(parameterType.arguments.zip(p.typeArguments).map {
@@ -652,10 +636,10 @@ object Conformance extends api.Conformance {
 
     trait ExistentialVisitor extends ScalaTypeVisitor {
       override def visitExistentialType(ex: ScExistentialType) {
-        handler.foreach(_.rvisit("ExistentialVisitor - skip"))
+        handler.foreach(_.rvisit("ExistentialVisitor - ok"))
         val inner = handler.map(_.inner)
         result = conformsInner(l, ex.quantified, HashSet.empty, undefinedSubst, handler = inner)
-
+        handler.foreach(_ + ConformanceCondition.ExistentialRight(l, ex, Relation.Conformance(l, ex.quantified, inner.get.conditions)))
       }
     }
 
@@ -663,9 +647,7 @@ object Conformance extends api.Conformance {
       def stopProjectionAliasOnFailure: Boolean = false
 
       override def visitProjectionType(proj2: ScProjectionType) {
-        handler.foreach { h =>
-          h.rvisit("ProjectionVisitor - ok")
-        }
+        handler.foreach(_.rvisit("ProjectionVisitor - ok"))
         proj2.isAliasType match {
           case Some(AliasType(_, _, upper)) =>
             if (upper.isEmpty) return
@@ -686,10 +668,8 @@ object Conformance extends api.Conformance {
                 val projected2 = proj2.projected
                 val inner = handler.map(_.inner)
                 result = conformsInner(projected1, projected2, visited, undefinedSubst, handler = inner)
-                handler.foreach { h =>
-                  h + ConformanceCondition.Projection(Relation.Conformance(projected1, projected2, inner.get.conditions))
-                }
-              case param@ParameterizedType(projDes: ScProjectionType, _) =>
+                handler.foreach(_ + ConformanceCondition.Projection(Relation.Conformance(projected1, projected2, inner.get.conditions)))
+              case param@ParameterizedType(projDes: ScProjectionType, _) => // TODO?
                 handler.foreach(_.logn("left is parametrized type of projection and what next - todo"))
                 //TODO this looks overcomplicated. Improve the code.
                 def cutProj(p: ScType, acc: List[ScProjectionType]): ScType = {
@@ -786,19 +766,14 @@ object Conformance extends api.Conformance {
 
     override def visitStdType(x: StdType) {
       handler.foreach { h =>
-        h.visit("visitStdType")
+        h.visit("visitStdType - ???")
       }
       var rightVisitor: ScalaTypeVisitor =
         new ValDesignatorSimplification with UndefinedSubstVisitor
           with AbstractVisitor
           with ParameterizedAbstractVisitor {}
       r.visitType(rightVisitor)
-      if (result != null) {
-        handler.foreach { h =>
-          h.logn("visitor found result")
-        }
-        return
-      }
+      if (result != null) return
 
       checkEquiv()
       if (result != null) return
@@ -1198,10 +1173,7 @@ object Conformance extends api.Conformance {
     }
 
     override def visitParameterizedType(p: ParameterizedType) {
-      handler.foreach { h =>
-        h.log(p.designator.isValue, p.typeArguments)
-        h.visit("visitParameterizedType - ???")
-      }
+      handler.foreach(_.visit(s"visitParameterizedType - ok"))
 
       var rightVisitor: ScalaTypeVisitor =
         new ValDesignatorSimplification with UndefinedSubstVisitor with AbstractVisitor {}
@@ -1211,7 +1183,12 @@ object Conformance extends api.Conformance {
 
       p.designator match {
         case a: ScAbstractType =>
-          handler.foreach(_.log("abstractType - skip"))
+          handler.foreach(_.log(s"abstractType - skip $a ${a.upper} ${a.lower}"))
+          val args = p.typeArguments.map {
+            case a: ScAbstractType => s"$a ${a.upper} ${a.lower}"
+            case o => o.toString
+          }.mkString(", ")
+          handler.foreach(_.log(s"add $args"))
           val subst = ScSubstitutor(a.parameterType.arguments.zip(p.typeArguments).map {
             case (tpt: TypeParameterType, tp: ScType) => (tpt.nameAndId, tp)
           }.toMap)
@@ -1220,10 +1197,6 @@ object Conformance extends api.Conformance {
               case ParameterizedType(upper, _) => ScParameterizedType(upper, p.typeArguments)
               case upper => ScParameterizedType(upper, p.typeArguments)
             }
-          handler.foreach { h =>
-            h.log(a.upper, a.lower, a.parameterType, a.parameterType.arguments)
-            h.logn(s"designator is abstract, compare with upper ~ $upper (why upper?) - ???")
-          }
           if (!upper.equiv(Any)) {
             result = conformsInner(upper, r, visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
           } else {
@@ -1352,103 +1325,135 @@ object Conformance extends api.Conformance {
           val args1 = p.typeArguments
           val args2 = p2.typeArguments
           (des1, des2) match {
-            case (owner1: TypeParameterType, _: TypeParameterType) => // TODO? how to fire
+            case (owner1: TypeParameterType, _: TypeParameterType) =>
               if (des1 equiv des2) {
                 if (args1.length != args2.length) {
                   result = (false, undefinedSubst)
-                  handler.foreach { h =>
-                    h + ConformanceCondition.Parametrize(p, p2, Some(Relation.Equivalence(des1, des2, satisfy = true)), sameLength = false, Seq())
-                  }
+                  handler.foreach(_ + ConformanceCondition.Parametrize(p, p2,
+                    Some(Relation.Equivalence(des1, des2, satisfy = true)), sameLength = false, Seq()))
                 } else {
                   result = checkParameterizedType(owner1.arguments.map(_.psiTypeParameter).iterator, args1, args2,
                     undefinedSubst, visited, checkWeak, handler = handler)
-                  handler.foreach { h =>
-                    h + ConformanceCondition.Parametrize(p, p2, Some(Relation.Equivalence(des1, des2, satisfy = true)), sameLength = true, h.relations)
-                  }
+                  handler.foreach(h => h + ConformanceCondition.Parametrize(p, p2,
+                    Some(Relation.Equivalence(des1, des2, satisfy = true)), sameLength = true, h.relations))
                 }
               } else {
                 result = (false, undefinedSubst)
-                handler.foreach { h =>
-                  h + ConformanceCondition.Parametrize(p, p2, Some(Relation.Equivalence(des1, des2, satisfy = false)), sameLength = false, Seq())
-                }
+                handler.foreach(_ + ConformanceCondition.Parametrize(p, p2,
+                  Some(Relation.Equivalence(des1, des2, satisfy = false)), sameLength = false, Seq()))
               }
             case (_: UndefinedType, UndefinedType(parameterType, _)) =>
-              handler.foreach(_.logn("undefined types - skip now"))
               (if (args1.length != args2.length) findDiffLengthArgs(l, args2.length) else Some((args1, des1))) match {
                 case Some((aArgs, aType)) =>
                   undefinedSubst = undefinedSubst.addUpper(parameterType.nameAndId, aType)
                   result = checkParameterizedType(parameterType.arguments.map(_.psiTypeParameter).iterator, aArgs,
                     args2, undefinedSubst, visited, checkWeak, handler = handler)
+                  handler.foreach { h => // nontransitive relation
+                    h + ConformanceCondition.Parametrize(p, p2,
+                      Some(Relation.Equivalence(aType, des2, satisfy = true, restriction = true)), sameLength = true,
+                      h.relations
+                    )
+                  }
                 case _ =>
+                  handler.foreach(_ + ConformanceCondition.Parametrize(p, p2,
+                    Some(Relation.Equivalence(des1, des2, satisfy = true, restriction = true)), sameLength = true, Seq()))
                   result = (false, undefinedSubst)
               }
             case (UndefinedType(parameterType, _), _) =>
-              handler.foreach { h =>
-                h.logn("undefined types - skip now")
-              }
               (if (args1.length != args2.length) findDiffLengthArgs(r, args1.length) else Some((args2, des2))) match {
                 case Some((aArgs, aType)) =>
                   undefinedSubst = undefinedSubst.addLower(parameterType.nameAndId, aType)
                   result = checkParameterizedType(parameterType.arguments.map(_.psiTypeParameter).iterator, args1,
                     aArgs, undefinedSubst, visited, checkWeak, handler = handler)
+                  handler.foreach { h =>
+                    val parent = ScParameterizedType(aType, aArgs) match {
+                      case a: ScParameterizedType => a
+                      case _ => p2 // and what can i do?
+                    }
+                    val conformsParent = Relation.Conformance(parent, p2, Seq(ConformanceCondition.BaseClass(parent, p2,
+                      satisfy = true)))
+                    val conformsParameterize = Relation.Conformance(p, parent, Seq(ConformanceCondition.Parametrize(p, parent,
+                      Some(Relation.Equivalence(des1, aType, satisfy = true, restriction = true)), sameLength = true,
+                      h.relations
+                    )))
+                    h + ConformanceCondition.Transitive(p, parent, p2, conformsParameterize, conformsParent)
+                  }
                 case _ =>
                   result = (false, undefinedSubst)
               }
             case (_, UndefinedType(parameterType, _)) =>
-              handler.foreach { h =>
-                h.logn("undefined types - skip now")
-              }
               (if (args1.length != args2.length) findDiffLengthArgs(l, args2.length) else Some((args1, des1))) match {
                 case Some((aArgs, aType)) =>
                   undefinedSubst = undefinedSubst.addUpper(parameterType.nameAndId, aType)
                   result = checkParameterizedType(parameterType.arguments.map(_.psiTypeParameter).iterator, aArgs,
                     args2, undefinedSubst, visited, checkWeak, handler = handler)
+                  handler.foreach { h => // nontransitive relation
+                    h + ConformanceCondition.Parametrize(p, p2,
+                      Some(Relation.Equivalence(aType, des2, satisfy = true, restriction = true)), sameLength = true,
+                      h.relations
+                    )
+                  }
                 case _ =>
+                  handler.foreach(_ + ConformanceCondition.Parametrize(p, p2,
+                    Some(Relation.Equivalence(des1, des2, satisfy = true, restriction = true)), sameLength = true, Seq()))
                   result = (false, undefinedSubst)
               }
             case _ if des1 equiv des2 =>
               result =
                 if (args1.length != args2.length) {
-                  handler.foreach { h =>
-                    h + ConformanceCondition.Parametrize(p, p2, Some(Relation.Equivalence(des1, des2, satisfy = true)), sameLength = false,Seq())
-                  }
+                  handler.foreach(_ + ConformanceCondition.Parametrize(p, p2,
+                    Some(Relation.Equivalence(des1, des2, satisfy = true)), sameLength = false, Seq()))
                   (false, undefinedSubst)
                 }
                 else extractParams(des1) match {
                   case Some(params) =>
-                    val t = checkParameterizedType(params, args1, args2, undefinedSubst, visited, checkWeak, handler = handler)
-                    handler.foreach { h =>
-                      h + ConformanceCondition.Parametrize(p, p2, Some(Relation.Equivalence(des1, des2, satisfy = true)), sameLength = true,h.relations)
-                    }
+                    val inner = handler.map(_.inner)
+                    val t = checkParameterizedType(params, args1, args2, undefinedSubst, visited, checkWeak, handler = inner)
+                    handler.foreach(h => h + ConformanceCondition.Parametrize(p, p2,
+                      Some(Relation.Equivalence(des1, des2, satisfy = true)), sameLength = true, inner.get.relations))
                     t
                   case _ =>
-                    handler.foreach { h =>
-                      h + ConformanceCondition.Parametrize(p, p2, Some(Relation.Equivalence(des1, des2, satisfy = true)), sameLength = false, Seq())
-                    }
+                    handler.foreach(_ + ConformanceCondition.Parametrize(p, p2,
+                      Some(Relation.Equivalence(des1, des2, satisfy = true)), sameLength = false, Seq()))
                     (false, undefinedSubst)
                 }
-            case (_, t: TypeParameterType) if t.arguments.length == p2.typeArguments.length => // TODO?
+            case (_, t: TypeParameterType) if t.arguments.length == p2.typeArguments.length =>
               val subst = ScSubstitutor(t.arguments.zip(p.typeArguments).map {
                 case (tpt: TypeParameterType, tp: ScType) => (tpt.nameAndId, tp)
               }.toMap)
-              result = conformsInner(des1, subst.subst(t.upperType.v), visited, undefinedSubst, checkWeak, handler = handler.map(_.inner))
+              val inner = handler.map(_.inner)
+              result = conformsInner(des1, subst.subst(t.upperType.v), visited, undefinedSubst, checkWeak, handler = inner)
+              handler.foreach { h =>
+                val m = subst.subst(t.upperType.v)
+                h + ConformanceCondition.Transitive(l, m, r, Relation.Conformance(des1, m, inner.get.conditions),
+                  Relation.Conformance(m, r, Seq(ConformanceCondition.TypeUpper(m, r, satisfy = true))))
+              }
             case (proj1: ScProjectionType, proj2: ScProjectionType)
               if smartEquivalence(proj1.actualElement, proj2.actualElement) =>
               val t = conformsInner(proj1, proj2, visited, undefinedSubst, handler = handler.map(_.inner))
               if (!t._1) {
+                handler.foreach(_ + ConformanceCondition.Parametrize(p, p2, None, sameLength = true, Seq()))
                 result = (false, undefinedSubst)
               } else {
                 undefinedSubst = t._2
                 if (args1.length != args2.length) {
+                  handler.foreach(_ + ConformanceCondition.Parametrize(p, p2,
+                    Some(Relation.Equivalence(proj1, proj2, satisfy = true)), sameLength = false, Seq()))
                   result = (false, undefinedSubst)
                 } else {
                   proj1.actualElement match {
                     case td: ScTypeParametersOwner =>
                       result = checkParameterizedType(td.typeParameters.iterator, args1, args2, undefinedSubst, visited, checkWeak, handler = handler)
+                      handler.foreach(h => h + ConformanceCondition.Parametrize(p, p2,
+                        Some(Relation.Equivalence(proj1, proj2, satisfy = true)), sameLength = true, h.relations))
                     case td: PsiTypeParameterListOwner =>
                       result = checkParameterizedType(td.getTypeParameters.iterator, args1, args2, undefinedSubst, visited, checkWeak, handler = handler)
+                      handler.foreach(h => h + ConformanceCondition.Parametrize(p, p2,
+                        Some(Relation.Equivalence(proj1, proj2, satisfy = true)), sameLength = true, h.relations))
                     case _ =>
                       result = (false, undefinedSubst)
+                      handler.foreach(h => h + ConformanceCondition.Parametrize(p, p2,
+                        Some(Relation.Equivalence(proj1, proj2, satisfy = true)), sameLength = true, Seq()))
                   }
                 }
               }
@@ -1473,7 +1478,7 @@ object Conformance extends api.Conformance {
       if (result != null) return
 
       r match {
-        case _: JavaArrayType =>
+        case _: JavaArrayType => // TODO?
           handler.foreach { h =>
             h.logn("right is java array - skip")
           }
@@ -1487,6 +1492,7 @@ object Conformance extends api.Conformance {
             val argsPair = (arg, args.head)
             argsPair match {
               case (ScAbstractType(tpt, lower, upper), r) =>
+                handler.foreach(_.log("ScAbstractType - skip (not common)"))
                 val right =
                   if (tpt.arguments.nonEmpty && !r.isInstanceOf[ScParameterizedType])
                     ScParameterizedType(r, tpt.arguments)
@@ -1508,6 +1514,7 @@ object Conformance extends api.Conformance {
                   undefinedSubst = t._2
                 }
               case (l, ScAbstractType(tpt, lower, upper)) =>
+                handler.foreach(_.log("ScAbstractType - skip (not common)"))
                 val left =
                   if (tpt.arguments.nonEmpty && !l.isInstanceOf[ScParameterizedType])
                     ScParameterizedType(l, tpt.arguments)
@@ -1528,10 +1535,15 @@ object Conformance extends api.Conformance {
                   }
                   undefinedSubst = t._2
                 }
-              case (UndefinedType(parameterType, _), rt) => addBounds(parameterType, rt)
-              case (lt, UndefinedType(parameterType, _)) => addBounds(parameterType, lt)
+              case (UndefinedType(parameterType, _), rt) =>
+                // TODO?
+                addBounds(parameterType, rt)
+              case (lt, UndefinedType(parameterType, _)) =>
+                // TODO?
+                addBounds(parameterType, lt)
               case _ =>
                 val t = argsPair._1.equiv(argsPair._2, undefinedSubst, falseUndef = false)
+                handler.foreach(_ + ConformanceCondition.Equivalent(Relation.Equivalence(argsPair._1, argsPair._2, satisfy = t._1)))
                 if (!t._1) {
                   result = (false, undefinedSubst)
                   return
@@ -1835,9 +1847,7 @@ object Conformance extends api.Conformance {
     }
 
     override def visitUndefinedType(u: UndefinedType) {
-      handler.foreach { h =>
-        h.visit("visitUndefinedType - skip ??? (same effect)")
-      }
+      handler.foreach(_.visit("visitUndefinedType - skip"))
       val rightVisitor = new ValDesignatorSimplification {
         override def visitUndefinedType(u2: UndefinedType) {
           val name = u2.parameterType.nameAndId
@@ -1931,9 +1941,7 @@ object Conformance extends api.Conformance {
     }
 
     override def visitAbstractType(a: ScAbstractType) {
-      handler.foreach { h =>
-        h.visit("visitAbstractType - ok ??? (strange conditions)")
-      }
+      handler.foreach(_.visit(s"visitAbstractType - ??? ($a)"))
       val rightVisitor = new ValDesignatorSimplification with UndefinedSubstVisitor {}
       r.visitType(rightVisitor)
       if (result != null) return
@@ -1945,7 +1953,7 @@ object Conformance extends api.Conformance {
       val inner = handler.map(_.inner)
       result = conformsInner(a.upper, right, visited, undefinedSubst, checkWeak, handler = inner) // TODO? has opposite analog but much simplier
       handler.foreach { h =>
-        h + ConformanceCondition.PolymorphicArgument(a, right, satisfy = result._1)
+        h + ConformanceCondition.Abstract(a, right, satisfy = result._1)
       }
       if (result._1) {
         val t = conformsInner(right, a.lower, visited, result._2, checkWeak, handler = handler.map(_.inner))
@@ -2094,13 +2102,12 @@ object Conformance extends api.Conformance {
   def addArgedBound(parameterType: TypeParameterType, bound: ScType, undefinedSubst: ScUndefinedSubstitutor,
                     defArgs: Seq[ScType], undefArgs: Seq[ScType], variance: Int = 1,
                     addUpper: Boolean = false, addLower: Boolean = false, handler: Option[DCHandler.Conformance]): (Boolean, ScUndefinedSubstitutor) = {
-    handler.foreach { h =>
-      h.logn("addArgedBound - skip")
-    }
+    handler.foreach(_.logn("addArgedBound - skip"))
     if (!addUpper && !addLower) return (false, undefinedSubst)
     var res = undefinedSubst
     if (addUpper) res = res.addUpper(parameterType.nameAndId, bound, variance = variance)
     if (addLower) res = res.addLower(parameterType.nameAndId, bound, variance = variance)
+
     (true, res)
   }
 

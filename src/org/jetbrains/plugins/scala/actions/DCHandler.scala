@@ -2,7 +2,7 @@ package org.jetbrains.plugins.scala.actions
 
 import com.intellij.psi.PsiNamedElement
 import org.jetbrains.plugins.scala.lang.psi.types.api.{Any, Nothing, UndefinedType}
-import org.jetbrains.plugins.scala.lang.psi.types.{ScCompoundType, ScType, ScUndefinedSubstitutor, Signature, TypeAliasSignature}
+import org.jetbrains.plugins.scala.lang.psi.types.{ScCompoundType, ScType, ScUndefinedSubstitutor, ScalaTypeSystem, Signature, TypeAliasSignature}
 import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
 
 /**
@@ -52,7 +52,9 @@ object DCHandler {
       condition
     }
 
-    def +(variance: ConformanceCondition.Variance): Unit = _variances :+= variance
+    def +(variance: ConformanceCondition.Variance): Unit = {
+      _variances :+= variance
+    }
 
     def conditions: Seq[ConformanceCondition] = _conditions
 
@@ -85,13 +87,12 @@ object DCHandler {
     case class Arg(name: String,
                    expectedType: ScType,
                    actualType: ScType,
-                   undefinedSubstitutor: ScUndefinedSubstitutor,
                    conditions: Seq[ConformanceCondition]) {
       def satisfy: Boolean = conditions.exists(_.satisfy)
     }
 
-    private var _args: Seq[Arg] = Seq()
 
+    private var _args: Seq[Arg] = Seq()
     def +(arg: Arg): Arg = {
       _args :+= arg
       arg
@@ -113,6 +114,11 @@ object DCHandler {
                            lowers: Set[ScType])
 
     private var _restrictions: Seq[Restriction] = Seq.empty
+    private var _follows: Seq[Seq[Substitutor#Restriction]] = Seq.empty
+
+    def +(follow: Seq[Substitutor#Restriction]): Unit = {
+      _follows :+= follow
+    }
 
     def +(name: (String, Long)): Restriction = {
       val restriction = Restriction(name, None, Set.empty, Set.empty)
@@ -144,7 +150,10 @@ object DCHandler {
       }
     }
 
-    def restictions: Seq[Restriction] = _restrictions
+    def inner: Substitutor = new Substitutor(delimeter + "|", debug)
+
+    def result: Seq[Seq[Substitutor#Restriction]] =
+      if (_follows.nonEmpty) _follows else Seq(_restrictions)
   }
 
   class Resolver(delimter: String, debug: Boolean) extends DCHandler(delimter, debug) {
@@ -153,11 +162,25 @@ object DCHandler {
     case class Candidate(rr: Option[ScalaResolveResult],
                          weights: Map[PsiNamedElement, Weight],
                          args: Seq[DCHandler.Compatibility#Arg],
-                         restrictions: Seq[DCHandler.Substitutor#Restriction])
+                         restrictions: Seq[Seq[DCHandler.Substitutor#Restriction]])
+    case class Ret(expextedType: ScType,
+                   actualType: ScType,
+                   conditions: Seq[ConformanceCondition],
+                   subs: ScUndefinedSubstitutor)
 
     private var _last: Option[PsiNamedElement] = None
     private var _candidates: Map[PsiNamedElement, Candidate] = Map.empty
     private var _elementMap: Map[PsiNamedElement, PsiNamedElement] = Map.empty
+    private var _ret: Option[Ret] = None
+
+    def +(ret: Ret): Unit = _ret = Some(ret)
+
+    def ret: Option[Ret] = _ret
+
+    def subst: ScUndefinedSubstitutor = _ret match {
+      case Some(x) => x.subs
+      case None => ScUndefinedSubstitutor()(ScalaTypeSystem)
+    }
 
     private def resolve(el: PsiNamedElement) = _elementMap.getOrElse(el, el)
 
@@ -178,7 +201,7 @@ object DCHandler {
       }
     }
 
-    def addRestrictions(restrictions: Seq[Substitutor#Restriction]): Unit = {
+    def addRestrictions(restrictions: Seq[Seq[Substitutor#Restriction]]): Unit = {
       _last.flatMap(el => _candidates.get(el).map(el -> _)) match {
         case Some((el, candidate)) =>
           _candidates += el -> candidate.copy(restrictions = restrictions)
@@ -234,7 +257,7 @@ object DCHandler {
 
     def substitutor: Substitutor = new Substitutor(delimter + "s|", debug)
 
-    def conforemance: Conformance = new Conformance(delimter + "r|", debug)
+    def conformance: Conformance = new Conformance(delimter + "r|", debug)
 
     def candidates: List[(PsiNamedElement, Candidate)] = _candidates.toList
   }

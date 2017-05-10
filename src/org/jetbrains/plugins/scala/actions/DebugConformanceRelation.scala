@@ -1,6 +1,7 @@
 package org.jetbrains.plugins.scala.actions
 
 import com.intellij.psi.PsiNamedElement
+import org.jetbrains.plugins.scala.actions.DCHandler.Substitutor
 import org.jetbrains.plugins.scala.lang.psi.types.api.{ParameterizedType, UndefinedType}
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.ScMethodType
 import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScCompoundType, ScExistentialArgument, ScExistentialType, ScType, Signature, TypeAliasSignature}
@@ -19,7 +20,7 @@ object ConformanceCondition {
     def satisfy: Boolean
   }
 
-  case class Invariant(param: String, relation: Relation.Equivalence) extends Variance {
+  case class Invariant(param: String, relation: Relation.Equivalence, restriction: Boolean = false) extends Variance {
     override def satisfy: Boolean = relation.satisfy
   }
   case class Covariant(param: String, relation: Relation.Conformance) extends Variance {
@@ -30,15 +31,11 @@ object ConformanceCondition {
   }
 
 
-  case class Same(equiv: Relation.Equivalence, relation: Relation.Conformance) extends ConformanceCondition { // TODO? remove
-    override def satisfy: Boolean = equiv.satisfy && relation.satisfy
-  }
-
   case class Projection(conforms: Relation.Conformance) extends ConformanceCondition {
     override def satisfy: Boolean = conforms.satisfy
   }
 
-  case class PolymorphicArgument(left: ScAbstractType, right: ScType, satisfy: Boolean) extends ConformanceCondition
+  case class Abstract(left: ScAbstractType, right: ScType, satisfy: Boolean) extends ConformanceCondition
 
   case class Transitive(left: ScType, middle: ScType, right: ScType, lm: Relation.Conformance, mr: Relation.Conformance) extends ConformanceCondition {
     override def satisfy: Boolean = lm.satisfy && mr.satisfy
@@ -70,6 +67,8 @@ object ConformanceCondition {
   }
 
   case class BaseClass(left: ScType, right: ScType, satisfy: Boolean) extends ConformanceCondition
+
+  case class Todo(reason: String, satisfy: Boolean) extends ConformanceCondition
 
   case class Method(left: ScMethodType, right: ScMethodType, sameLen: Boolean, ret: Option[Relation.Conformance],
                     args: Seq[Invariant]) extends ConformanceCondition {
@@ -104,7 +103,7 @@ sealed trait Relation {
 }
 
 object Relation {
-  case class Equivalence(left: ScType, right: ScType, satisfy: Boolean) extends Relation
+  case class Equivalence(left: ScType, right: ScType, satisfy: Boolean, restriction: Boolean = false) extends Relation
 
   case class Conformance(left: ScType, right: ScType, conditions: Seq[ConformanceCondition]) extends Relation {
     def satisfy: Boolean = conditions.exists(_.satisfy)
@@ -116,7 +115,7 @@ sealed trait AsSpecificAsCondition {
 }
 
 object AsSpecificAsCondition {
-  case class Method(left: ScType, right: ScType, args: DCHandler.Args) extends AsSpecificAsCondition {
+  case class Method(left: ScType, right: ScType, args: DCHandler.Args, restrictions: Seq[Seq[Substitutor#Restriction]]) extends AsSpecificAsCondition {
     override def satisfy: Boolean = args.forall(_.satisfy)
   }
   case class Polymorphic(satisfy: Boolean) extends AsSpecificAsCondition
