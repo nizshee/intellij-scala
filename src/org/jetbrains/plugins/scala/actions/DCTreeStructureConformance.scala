@@ -152,7 +152,7 @@ object DCTreeStructureConformance {
           s"${c.upper} is upper bound for ${c.`type`}"
         case c: ConformanceCondition.TypeLower =>
           s"${c.lower} is lower bound for ${c.`type`}"
-        case c: ConformanceCondition.Abstract =>
+        case c: ConformanceCondition.AbstractLeft =>
           s"abstract ${c.left.lower} <: ${c.left} <: ${c.left.upper} satisfies ${c.right}"
         case c: ConformanceCondition.FromNull =>
           s"${c.left} is conforms to AnyRef"
@@ -217,7 +217,7 @@ object DCTreeStructureConformance {
           |3. If the i'th type parameter of T is declared neither covariant nor contravariant, then Ui $equiv Ti.""".stripMargin + conformance
       case _: Todo =>
         """Not implemented yet."""
-      case _: Abstract =>
+      case _: AbstractLeft =>
         """"""
     }
   }

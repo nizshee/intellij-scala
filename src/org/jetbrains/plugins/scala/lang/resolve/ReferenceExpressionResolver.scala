@@ -136,8 +136,7 @@ object ReferenceExpressionResolver {
 
     var result: Array[ResolveResult] = Array.empty
     if (shapesOnly) {
-      handler.foreach(_.log("shape only case - skip")) // TODO? why shapes only - doResolve and main case not
-      result = doResolve(reference, processor(smartProcessor = false), handler = handler)
+      result = doResolve(reference, processor(smartProcessor = false))
     } else {
       val candidatesS = processor(smartProcessor = true).candidatesS //let's try to avoid treeWalkUp
       if (candidatesS.isEmpty || candidatesS.forall(!_.isApplicable())) {
@@ -148,34 +147,28 @@ object ReferenceExpressionResolver {
         // so shape resolve return this wrong result
         // however there is implicit conversion with right argument
         // this is ugly, but it can improve performance
-        result = doResolve(reference, processor(smartProcessor = false), handler = handler)
+        result = doResolve(reference, processor(smartProcessor = false))
       } else {
         result = candidatesS.toArray
       }
     }
-    handler.foreach(_.log(s"processor returned result ${result.toList.map(_.getElement.getNode.getText)}"))
+
     if (result.isEmpty && reference.isAssignmentOperator) {
       handler.foreach(_.log("empty result + assignment operator - skip"))
       val assignProcessor = new MethodResolveProcessor(reference, reference.refName.init, List(argumentsOf(reference)),
         Nil, prevInfoTypeParams, isShapeResolve = shapesOnly, enableTupling = true)
-      result = doResolve(reference, assignProcessor, handler = handler)
+      result = doResolve(reference, assignProcessor)
       result.map(r => r.asInstanceOf[ScalaResolveResult].copy(isAssignment = true): ResolveResult)
     } else {
-      result // TODO? no doResolve in main path?
+      result
     }
   }
 
-  @uninstrumental("handler")
-  def doResolve(ref: ScReferenceExpression, processor: BaseProcessor, accessibilityCheck: Boolean = true,
-                handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
-    handler.foreach(_.log("doResolve - skip"))
+  def doResolve(ref: ScReferenceExpression, processor: BaseProcessor, accessibilityCheck: Boolean = true): Array[ResolveResult] = {
     implicit val manager = ref.getManager
     implicit val typeSystem = ref.typeSystem
 
     def resolveUnqalified(processor: BaseProcessor): BaseProcessor = {
-      handler.foreach { h =>
-        h.logn("resolveUnqalified")
-      }
       ref.getContext match {
         case ScSugarCallExpr(operand, operation, _) if ref == operation =>
           processTypes(operand, processor)
@@ -186,9 +179,6 @@ object ReferenceExpressionResolver {
     }
 
     def resolveUnqualifiedExpression(processor: BaseProcessor) {
-      handler.foreach { h =>
-        h.logn("resolveUnqualifiedExpression")
-      }
       @tailrec
       def treeWalkUp(place: PsiElement, lastParent: PsiElement) {
         if (place == null) return
@@ -215,9 +205,6 @@ object ReferenceExpressionResolver {
     }
 
     def processAssignment(assign: PsiElement, processor: BaseProcessor) {
-      handler.foreach { h =>
-        h.logn("processAssignment")
-      }
       assign.getContext match {
         //trying to resolve naming parameter
         case args: ScArgumentExprList =>
@@ -243,9 +230,6 @@ object ReferenceExpressionResolver {
 
     def processAnyAssignment(exprs: Seq[ScExpression], call: MethodInvocation, callReference: ScReferenceExpression, invocationCount: Int,
                              assign: PsiElement, processor: BaseProcessor) {
-      handler.foreach { h =>
-        h.logn("processAnyAssignment")
-      }
       val refName = ref.refName
       for (variant <- callReference.multiResolve(false)) {
         def processResult(r: ScalaResolveResult) = r match {
@@ -309,9 +293,6 @@ object ReferenceExpressionResolver {
     }
 
     def processConstructorReference(args: ScArgumentExprList, assign: PsiElement, baseProcessor: BaseProcessor) {
-      handler.foreach { h =>
-        h.logn("processConstructorReference")
-      }
       def processConstructor(elem: PsiElement, tp: ScType, typeArgs: Seq[ScTypeElement], arguments: Seq[ScArgumentExprList],
                              secondaryConstructors: (ScClass) => Seq[ScFunction]) {
         tp.extractClassType(ref.getProject) match {
@@ -443,9 +424,6 @@ object ReferenceExpressionResolver {
 
     def funCollectNamedCompletions(clauses: ScParameters, assign: PsiElement, processor: BaseProcessor,
                                            subst: ScSubstitutor, exprs: Seq[ScExpression], invocationCount: Int) {
-      handler.foreach { h =>
-        h.logn("funCollectNamedCompletions")
-      }
       if (clauses.clauses.length >= invocationCount) {
         val actualClause = clauses.clauses(invocationCount - 1)
         val params = new ArrayBuffer[ScParameter] ++ actualClause.parameters
@@ -478,7 +456,6 @@ object ReferenceExpressionResolver {
 
     def processTypes(e: ScExpression, processor: BaseProcessor): BaseProcessor = {
       ProgressManager.checkCanceled()
-      handler.foreach(_.logn("processTypes"))
 
       e.getNonValueType() match {
         case Success(ScTypePolymorphicType(internal, tp), _) if tp.nonEmpty &&
@@ -496,7 +473,6 @@ object ReferenceExpressionResolver {
     }
 
     def processType(aType: ScType, e: ScExpression, processor: BaseProcessor): BaseProcessor = {
-      handler.foreach(_.logn("processType"))
       val shape = processor match {
         case m: MethodResolveProcessor => m.isShapeResolve
         case _ => false
@@ -550,7 +526,6 @@ object ReferenceExpressionResolver {
     }
 
     def processDynamic(`type`: ScType, e: ScExpression, baseProcessor: BaseProcessor): BaseProcessor = {
-      handler.foreach(_.logn("processDynamic"))
       ScalaPsiManager.instance(ref.getProject).getCachedClass(ref.getResolveScope, "scala.Dynamic").map {
         ScDesignatorType(_)
       }.filter {
@@ -590,7 +565,6 @@ object ReferenceExpressionResolver {
     }
 
     def collectImplicits(e: ScExpression, processor: BaseProcessor, noImplicitsForArgs: Boolean) {
-      handler.foreach(_.logn("collectImplicits"))
       def builder(result: ImplicitResolveResult): ResolverStateBuilder = {
         ProgressManager.checkCanceled()
         new ImplicitResolveResult.ResolverStateBuilder(result).withImports
@@ -632,8 +606,7 @@ object ReferenceExpressionResolver {
         processTypes(q, processor)
     }
     val res = actualProcessor.rrcandidates
-    handler.foreach(_.logn(s"actualPorcessor rrcanidates are ${res.toList}"))
-    if (accessibilityCheck && res.length == 0) return doResolve(ref, processor, accessibilityCheck = false, handler = handler)
+    if (accessibilityCheck && res.length == 0) return doResolve(ref, processor, accessibilityCheck = false)
     res
   }
 

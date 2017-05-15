@@ -8,7 +8,7 @@ import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
 /**
   * Created by user on 4/10/17.
   */
-class DCHandler(delimeter: String, debug: Boolean) {
+protected class DCHandler(delimeter: String, debug: Boolean) {
   def log(any: Any): Unit = if (debug) println(delimeter + any)
   def logn(any: Any): Unit = if (debug) {
     println(delimeter + any)
@@ -23,6 +23,11 @@ object DCHandler {
     private var _compound: Option[ConformanceCondition.CompoundLeft] = None
     private var _conditions: Seq[ConformanceCondition] = Seq()
     private var _variances: Seq[ConformanceCondition.Variance] = Seq()
+    private var _corrupted: Boolean = false
+
+    def corrupt(): Unit = _corrupted = true
+
+    def corrupted: Boolean = _corrupted
 
     def addCompound(compound: ScCompoundType, right: ScType): Unit = _compound =
       Some(ConformanceCondition.CompoundLeft(compound, right, Map(), Map(), Seq()))
@@ -66,8 +71,8 @@ object DCHandler {
     }
 
     def logtn(left: ScType, right: ScType): Unit = {
-      log(s"left: ${left.presentableText}")
-      logn(s"right: ${right.presentableText}")
+      log(s"left: ${left.presentableText} ${left.getClass}")
+      logn(s"right: ${right.presentableText} ${right.getClass}")
     }
 
     def visit(any: Any): Unit = {
@@ -78,8 +83,17 @@ object DCHandler {
       logn("right visit " + any)
     }
 
+    def clean(): Unit = {
+      _corrupted = false
+      _compound = None
+      _conditions = Seq.empty
+      _variances = Seq.empty
+    }
 
-    def inner: Conformance =  new Conformance(delimeter + "|", debug)
+
+    def inner: Conformance = new Conformance(delimeter + "|", debug)
+
+    def substitutor: Substitutor = new Substitutor(delimeter + "s|", debug)
   }
 
 
@@ -249,15 +263,18 @@ object DCHandler {
       )
     }
 
-    def clear(): Unit = {
-      _candidates = Map.empty
-    }
-
     def compatibility: Compatibility = new Compatibility(delimter + "c|", debug)
 
     def substitutor: Substitutor = new Substitutor(delimter + "s|", debug)
 
     def conformance: Conformance = new Conformance(delimter + "r|", debug)
+
+    def clear(): Unit = {
+      _last = None
+      _elementMap = Map.empty
+      _ret = None
+      _candidates = Map.empty
+    }
 
     def candidates: List[(PsiNamedElement, Candidate)] = _candidates.toList
   }

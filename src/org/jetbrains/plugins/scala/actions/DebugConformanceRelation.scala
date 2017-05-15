@@ -35,7 +35,15 @@ object ConformanceCondition {
     override def satisfy: Boolean = conforms.satisfy
   }
 
-  case class Abstract(left: ScAbstractType, right: ScType, satisfy: Boolean) extends ConformanceCondition
+  case class AbstractLeft(left: ScAbstractType, right: ScType, upper: ScType, uConditions: Seq[ConformanceCondition],
+                          lower: ScType, lConfitions: Seq[ConformanceCondition]) extends ConformanceCondition {
+    override def satisfy: Boolean = uConditions.exists(_.satisfy) && lConfitions.exists(_.satisfy)
+  }
+
+  case class AbstractRight(left: ScType, right: ScAbstractType, upper: ScType, uConditions: Seq[ConformanceCondition],
+                          lower: ScType, lConfitions: Seq[ConformanceCondition]) extends ConformanceCondition {
+    override def satisfy: Boolean = uConditions.exists(_.satisfy) && lConfitions.exists(_.satisfy)
+  }
 
   case class Transitive(left: ScType, middle: ScType, right: ScType, lm: Relation.Conformance, mr: Relation.Conformance) extends ConformanceCondition {
     override def satisfy: Boolean = lm.satisfy && mr.satisfy
@@ -75,6 +83,11 @@ object ConformanceCondition {
     override def satisfy: Boolean = sameLen && ret.exists(_.satisfy) && args.forall(_.satisfy)
   }
 
+  case class Polymorphic(il: ScType, ir: ScType, sameLength: Boolean,
+                         args: Seq[(Relation.Conformance, Relation.Conformance)], i: Option[Relation.Conformance]) extends ConformanceCondition {
+    override def satisfy: Boolean = sameLength && args.forall(p => p._1.satisfy && p._2.satisfy) && i.exists(_.satisfy)
+  }
+
   case class Undefined(left: ScType, right: UndefinedType, cond: ScType) extends ConformanceCondition {
     override def satisfy: Boolean = true
   }
@@ -94,6 +107,11 @@ object ConformanceCondition {
 
   case class ExistentialRight(left: ScType, right: ScExistentialType, conformance: Relation.Conformance) extends ConformanceCondition {
     override def satisfy: Boolean = conformance.satisfy
+  }
+
+  case class ExistentialLeft(left: ScExistentialType, right: ScType, conformance: Relation.Conformance,
+                             restrictions: Seq[Seq[Substitutor#Restriction]]) extends ConformanceCondition {
+    override def satisfy: Boolean = restrictions.isEmpty || restrictions.exists(_.forall(_.`type`.nonEmpty))
   }
 
 }

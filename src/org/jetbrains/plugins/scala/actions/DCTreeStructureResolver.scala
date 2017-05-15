@@ -16,7 +16,7 @@ import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
 import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.ScReferencePattern
 import org.jetbrains.plugins.scala.lang.psi.api.statements.{ScFun, ScFunction, ScPatternDefinition, ScVariableDefinition}
 import org.jetbrains.plugins.scala.lang.psi.api.toplevel.ScTypedDefinition
-import org.jetbrains.plugins.scala.lang.psi.types.api.Nothing
+import org.jetbrains.plugins.scala.lang.psi.types._
 
 /**
   * Created by user on 4/10/17.
@@ -55,6 +55,9 @@ class DCTreeStructureResolver(values: Seq[DCTreeStructureResolver.Value])(implic
     case n: RelationNode =>
       val children = n.getChildren
       children.toArray(new Array[AnyRef](children.size))
+    case n: TextNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
     case n: ElementNode =>
       val children = n.getChildren
       children.toArray(new Array[AnyRef](children.size))
@@ -89,10 +92,10 @@ object DCTreeStructureResolver {
 
   @inline private def el2String(el: PsiNamedElement): String = el match {
     case fun: ScFun => fun.methodType.toString
-    case f: ScFunction => "???1"
+    case f: ScFunction =>
       val name = f.name
       val ty = f.getType().getOrNothing
-      s"$name: $ty"
+      (if (f.typeParameters.nonEmpty) s"[${f.typeParameters.map(_.name).mkString(", ")}] " else "") + s"$name: $ty"
     case p: ScPrimaryConstructor => "???2"
     case m: PsiMethod => "???3"
     case refPatt: ScReferencePattern => refPatt.getParent.getParent match { // TODO temroary
@@ -113,8 +116,8 @@ object DCTreeStructureResolver {
 
   case class Value(el: PsiNamedElement, candidate: DCHandler.Resolver#Candidate, ret: Option[DCHandler.Resolver#Ret], prefix: String = "")
   case class CandidateValue(el: PsiNamedElement, candidate: DCHandler.Resolver#Candidate, ret: Option[DCHandler.Resolver#Ret])
-  case class WeightsValue(weights: Map[PsiNamedElement, DCHandler.Resolver#Weight])
   case class WeightValue(el: PsiNamedElement, weight: DCHandler.Resolver#Weight)
+  case class WeightsValue(weights: Map[PsiNamedElement, DCHandler.Resolver#Weight])
 
   class CandidateNode(value: CandidateValue)(implicit project: Project) extends AbstractPsiBasedNode[CandidateValue](project, value, ViewSettings.DEFAULT) {
     private val greaterWeight = value.candidate.weights.values.forall(w => w.v > w.opposite)
@@ -123,19 +126,38 @@ object DCTreeStructureResolver {
     private val weights = Some(value.candidate.weights).filter(_.nonEmpty).map(w => new WeightNode(WeightsValue(w)))
     private val compatibility = Some(value.candidate.args).filter(_.nonEmpty).map(a => new CompatibilityNode(CompatibilityValue(a, value.ret)))
     private val restrictions = Some(value.candidate.restrictions).filter(_.exists(_.nonEmpty)).map(r => new SubstitutorNode(SubstitutorValue(r)))
+    private val problems = value.candidate.rr.iterator.flatMap(_.problems).toSeq.filterNot {
+      case ExpectedTypeMismatch => true
+      case _: TypeMismatch => true
+      case _ => false
+    }
 
     override def getChildrenImpl: util.Collection[AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
-      compatibility.foreach(list.add)
-      restrictions.foreach(list.add)
-      weights.foreach(list.add)
+      if (problems.nonEmpty) {
+        val texts = problems.map {
+          case DoesNotTakeParameters() => "Function does not take parameters"
+          case ExcessArgument(_) => "Too many arguments for method"
+          case MalformedDefinition() => "Method has malformed definition"
+          case ExpansionForNonRepeatedParameter(_) => "Expansion for non-repeated parameter"
+          case PositionalAfterNamedArgument(_) => "Positional after named argument"
+          case ParameterSpecifiedMultipleTimes(_) => "Parameter specified multiple times"
+          case _ => "applicable problem"
+        }
+        texts.foreach(text => list.add(new TextNode(TextValue(text, satisfy = false))))
+      }
+      else {
+        compatibility.foreach(list.add)
+        restrictions.foreach(list.add)
+        weights.foreach(list.add)
+      }
       list
     }
 
     override def updateImpl(presentationData: PresentationData): Unit = {
       val text = el2String(value.el)
       presentationData.setPresentableText(text)
-      if (!greaterWeight || !conditionsExists || !restictionsHaveSolution)
+      if (!greaterWeight || !conditionsExists || !restictionsHaveSolution || problems.nonEmpty)
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
 
@@ -173,6 +195,17 @@ object DCTreeStructureResolver {
       presentationData.setPresentableText(s"${value.weight.v} (${value.weight.opposite}) ${el2String(value.el)}")
       if (value.weight.v <= value.weight.opposite)
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
+    }
+  }
+
+  case class TextValue(text: String, satisfy: Boolean)
+  class TextNode(value: TextValue)(implicit project: Project) extends AbstractTreeNode[TextValue](project, value) {
+
+    override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = new util.ArrayList[AbstractTreeNode[_]]()
+
+    override def update(presentationData: PresentationData): Unit = {
+      presentationData.setPresentableText(value.text)
+      if (!value.satisfy) presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
   }
 }

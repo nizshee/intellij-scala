@@ -229,7 +229,6 @@ object Compatibility {
           case None => Nil
           case Some(exprType) =>
             handler.foreach { h =>
-              h.log(s"find constaints to $exprType >: $paramType")
               val cHandler = handler.map(_.handler)
               typeSystem.conformance.conformsInner(paramType, exprType,
                 substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = cHandler)
