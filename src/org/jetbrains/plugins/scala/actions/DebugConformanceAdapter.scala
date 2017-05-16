@@ -1,6 +1,6 @@
 package org.jetbrains.plugins.scala.actions
 
-import org.jetbrains.plugins.scala.actions.ConformanceCondition._
+import org.jetbrains.plugins.scala.actions.CCondition._
 import org.jetbrains.plugins.scala.actions.Relation.{Conformance, Equivalence}
 import org.jetbrains.plugins.scala.lang.psi.types.ScalaTypeSystem
 import org.jetbrains.plugins.scala.lang.psi.types.api.TypeSystem
@@ -10,7 +10,7 @@ object DebugConformanceAdapter {
 
   implicit val typeSystem: TypeSystem = ScalaTypeSystem
 
-  def adaptConditions(condition: ConformanceCondition): Seq[ConformanceCondition] = condition match {
+  def adaptConditions(condition: CCondition): Seq[CCondition] = condition match {
     case Transitive(l, m, _, _, mr) if l.equiv(m) => mr.conditions
     case Transitive(_, m, r, lm, _) if m.equiv(r) => lm.conditions
     case _ => Seq(condition)

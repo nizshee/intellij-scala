@@ -224,7 +224,7 @@ object Compatibility {
         val expectedType = param.expectedType
         handler.foreach(_.log(s"doNoNamed for ${param.name} expected $expectedType"))
         val typeResult =
-          expr.getTypeAfterImplicitConversion(checkWithImplicits, isShapesResolve, Some(expectedType).filter(_ => handler.isEmpty && true))._1
+          expr.getTypeAfterImplicitConversion(checkWithImplicits, isShapesResolve, Some(expectedType))._1
         typeResult.toOption match {
           case None => Nil
           case Some(exprType) =>
@@ -235,7 +235,7 @@ object Compatibility {
               h + h.Arg(param.name, exprType, paramType,
                 Relation.Conformance(exprType, paramType, cHandler.get.conditions).conditions)
             }
-            val conforms = exprType.weakConforms(paramType) // TODO? calculates two times, i'll add third
+            val conforms = exprType.weakConforms(paramType)
             matched ::=(param, expr.expr)
             matchedTypes ::=(param, exprType)
             if (!conforms) List(TypeMismatch(expr.expr, paramType))

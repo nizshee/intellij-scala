@@ -1,7 +1,7 @@
 package org.jetbrains.plugins.scala.lang.resolve.processor
 
 import com.intellij.psi._
-import org.jetbrains.plugins.scala.actions.{ConformanceCondition, DCHandler}
+import org.jetbrains.plugins.scala.actions.{CCondition, DCHandler}
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScFieldId
 import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.ScBindingPattern

@@ -10,7 +10,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.{PsiElement, PsiField, PsiMethod, PsiNamedElement}
 import org.jetbrains.plugins.scala.actions.DCTreeStructureCompatibility.{CompatibilityNode, CompatibilityValue, MostSpecificNode, MostSpecificValue}
-import org.jetbrains.plugins.scala.actions.DCTreeStructureConformance.{ActualElementNode, ConditionNode, ElementNode, RelationNode}
+import org.jetbrains.plugins.scala.actions.DCTreeStructureConformance._
 import org.jetbrains.plugins.scala.actions.DCTreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue, TypeVariableNode}
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
 import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.ScReferencePattern
@@ -64,7 +64,10 @@ class DCTreeStructureResolver(values: Seq[DCTreeStructureResolver.Value])(implic
     case n: ActualElementNode =>
       val children = n.getChildren
       children.toArray(new Array[AnyRef](children.size))
-    case n: ConditionNode =>
+    case n: CConditionNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
+    case n: EConditionNode =>
       val children = n.getChildren
       children.toArray(new Array[AnyRef](children.size))
     case n: SubstitutorNode =>
@@ -123,9 +126,6 @@ object DCTreeStructureResolver {
     private val greaterWeight = value.candidate.weights.values.forall(w => w.v > w.opposite)
     private val restictionsHaveSolution = value.candidate.restrictions.exists(_.forall(_.`type`.nonEmpty)) || value.candidate.restrictions.isEmpty
     private val conditionsExists = value.candidate.args.forall(_.conditions.exists(_.satisfy))
-    private val weights = Some(value.candidate.weights).filter(_.nonEmpty).map(w => new WeightNode(WeightsValue(w)))
-    private val compatibility = Some(value.candidate.args).filter(_.nonEmpty).map(a => new CompatibilityNode(CompatibilityValue(a, value.ret)))
-    private val restrictions = Some(value.candidate.restrictions).filter(_.exists(_.nonEmpty)).map(r => new SubstitutorNode(SubstitutorValue(r)))
     private val problems = value.candidate.rr.iterator.flatMap(_.problems).toSeq.filterNot {
       case ExpectedTypeMismatch => true
       case _: TypeMismatch => true
@@ -147,9 +147,12 @@ object DCTreeStructureResolver {
         texts.foreach(text => list.add(new TextNode(TextValue(text, satisfy = false))))
       }
       else {
-        compatibility.foreach(list.add)
-        restrictions.foreach(list.add)
-        weights.foreach(list.add)
+        if (value.candidate.args.nonEmpty || value.ret.nonEmpty)
+          list.add(new CompatibilityNode(CompatibilityValue(value.candidate.args, value.ret)))
+        if (value.candidate.restrictions.exists(_.nonEmpty))
+          list.add(new SubstitutorNode(SubstitutorValue(value.candidate.restrictions)))
+        if (value.candidate.weights.nonEmpty)
+          list.add(new WeightNode(WeightsValue(value.candidate.weights)))
       }
       list
     }

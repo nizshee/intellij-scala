@@ -6,7 +6,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Computable
 import com.intellij.psi.PsiClass
 import com.intellij.util.containers.ContainerUtil
-import org.jetbrains.plugins.scala.actions.{ConformanceCondition, DCHandler, DebugConformanceAction}
+import org.jetbrains.plugins.scala.actions.{CCondition, DCHandler, DebugConformanceAction}
 import org.jetbrains.plugins.scala.caches.RecursionManager
 import org.jetbrains.plugins.scala.lang.psi.types._
 import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
@@ -38,8 +38,8 @@ trait Conformance extends TypeSystemOwner {
 
     if (left.equiv(Any) || right.equiv(Nothing)) {
       handler.foreach { h =>
-        if (left equiv Any) h + ConformanceCondition.ToAny(right)
-        else h + ConformanceCondition.FromNothing(left)
+        if (left equiv Any) h + CCondition.ToAny(right)
+        else h + CCondition.FromNothing(left)
       }
       return (true, substitutor)
     }

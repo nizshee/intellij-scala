@@ -281,17 +281,19 @@ object MethodResolveProcessor {
         handler.foreach(_ + cHandler.get.args)
         problems ++= result.problems
         addExpectedTypeProblems(Some(retType))
-        if (handler.nonEmpty) result.copy(problems = problems, undefSubst = result.undefSubst + handler.get.subst)
+        if (handler.nonEmpty) result.copy(problems = problems, undefSubst = result.undefSubst + handler.get.subst) // TODO?
         else result.copy(problems)
       }
 
       fun match {
         case fun: ScFunction if fun.paramClauses.clauses.isEmpty =>
           addExpectedTypeProblems()
-          return ConformanceExtResult(problems)
+          if (handler.nonEmpty) return ConformanceExtResult(problems, undefSubst = handler.get.subst)
+          else return ConformanceExtResult(problems)
         case fun: ScFun if fun.paramClauses.isEmpty =>
           addExpectedTypeProblems()
-          return ConformanceExtResult(problems)
+          if (handler.nonEmpty) return ConformanceExtResult(problems, undefSubst = handler.get.subst)
+          else return ConformanceExtResult(problems)
         case _ =>
       }
 
@@ -421,7 +423,7 @@ object MethodResolveProcessor {
           handler.foreach(_ + cHandler.get.args)
           problems ++= result.problems
           addExpectedTypeProblems()
-          if (handler.nonEmpty) result.copy(problems = problems, undefSubst = result.undefSubst + handler.get.subst)
+          if (handler.nonEmpty) result.copy(problems = problems, undefSubst = result.undefSubst + handler.get.subst) // TODO?
           else result.copy(problems)
         }
       case tp: PsiTypeParameterListOwner with PsiNamedElement =>
@@ -446,7 +448,7 @@ object MethodResolveProcessor {
           handler.foreach(_ + cHandler.get.args)
           problems ++= result.problems
           addExpectedTypeProblems()
-          if (handler.nonEmpty) result.copy(problems = problems, undefSubst = result.undefSubst + handler.get.subst)
+          if (handler.nonEmpty) result.copy(problems = problems, undefSubst = result.undefSubst + handler.get.subst) // TODO?
           else result.copy(problems)
         }
       case _ =>

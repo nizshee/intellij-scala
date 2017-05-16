@@ -20,9 +20,9 @@ object DCHandler {
 
   class Conformance(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug) {
 
-    private var _compound: Option[ConformanceCondition.CompoundLeft] = None
-    private var _conditions: Seq[ConformanceCondition] = Seq()
-    private var _variances: Seq[ConformanceCondition.Variance] = Seq()
+    private var _compound: Option[CCondition.CompoundLeft] = None
+    private var _conditions: Seq[CCondition] = Seq()
+    private var _variances: Seq[CCondition.Variance] = Seq()
     private var _corrupted: Boolean = false
 
     def corrupt(): Unit = _corrupted = true
@@ -30,7 +30,7 @@ object DCHandler {
     def corrupted: Boolean = _corrupted
 
     def addCompound(compound: ScCompoundType, right: ScType): Unit = _compound =
-      Some(ConformanceCondition.CompoundLeft(compound, right, Map(), Map(), Seq()))
+      Some(CCondition.CompoundLeft(compound, right, Map(), Map(), Seq()))
 
     def addAlias(name: String, sign: TypeAliasSignature, el: PsiNamedElement): Unit = _compound match {
       case Some(x) => _compound = Some(x.copy(aliases = x.aliases.updated(name -> sign, el)))
@@ -52,18 +52,18 @@ object DCHandler {
       case None =>
     }
 
-    def +(condition: ConformanceCondition): ConformanceCondition = {
+    def +(condition: CCondition): CCondition = {
       _conditions :+= condition
       condition
     }
 
-    def +(variance: ConformanceCondition.Variance): Unit = {
+    def +(variance: CCondition.Variance): Unit = {
       _variances :+= variance
     }
 
-    def conditions: Seq[ConformanceCondition] = _conditions
+    def conditions: Seq[CCondition] = _conditions
 
-    def relations: Seq[ConformanceCondition.Variance] = _variances
+    def relations: Seq[CCondition.Variance] = _variances
 
     def logt(left: ScType, right: ScType): Unit = {
       log(s"left: ${left.presentableText}")
@@ -71,8 +71,8 @@ object DCHandler {
     }
 
     def logtn(left: ScType, right: ScType): Unit = {
-      log(s"left: ${left.presentableText} ${left.getClass}")
-      logn(s"right: ${right.presentableText} ${right.getClass}")
+      log(s"left: ${left.presentableText}")
+      logn(s"right: ${right.presentableText}")
     }
 
     def visit(any: Any): Unit = {
@@ -101,7 +101,7 @@ object DCHandler {
     case class Arg(name: String,
                    expectedType: ScType,
                    actualType: ScType,
-                   conditions: Seq[ConformanceCondition]) {
+                   conditions: Seq[CCondition]) {
       def satisfy: Boolean = conditions.exists(_.satisfy)
     }
 
@@ -179,7 +179,7 @@ object DCHandler {
                          restrictions: Seq[Seq[DCHandler.Substitutor#Restriction]])
     case class Ret(expextedType: ScType,
                    actualType: ScType,
-                   conditions: Seq[ConformanceCondition],
+                   conditions: Seq[CCondition],
                    subs: ScUndefinedSubstitutor)
 
     private var _last: Option[PsiNamedElement] = None
@@ -280,5 +280,5 @@ object DCHandler {
   }
 
   type Args = Seq[DCHandler.Compatibility#Arg]
-  type Conditions = Seq[ConformanceCondition]
+  type Conditions = Seq[CCondition]
 }
