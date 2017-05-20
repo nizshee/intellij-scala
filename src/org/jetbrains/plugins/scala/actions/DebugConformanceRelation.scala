@@ -76,7 +76,7 @@ object CCondition {
     override def satisfy: Boolean = anyRef && !notNull
   }
 
-  case class BaseClass(left: ScType, right: ScType, satisfy: Boolean) extends CCondition
+  case class BaseType(left: ScType, right: ScType, satisfy: Boolean) extends CCondition
 
   case class Todo(reason: String, satisfy: Boolean) extends CCondition
 
@@ -126,10 +126,10 @@ sealed trait ECondition {
 }
 
 object ECondition {
-  case class Simple(satisfy: Boolean, restriction: Boolean = false) extends ECondition
+  case class Simple(satisfy: Boolean) extends ECondition
 
-  case class Special(left: Relation.Conformance, right: Relation.Conformance) extends ECondition {
-    override def satisfy: Boolean = left.satisfy && right.satisfy
+  case class Special(left: Option[Relation.Conformance], right: Option[Relation.Conformance]) extends ECondition {
+    override def satisfy: Boolean = left.forall(_.satisfy) && right.forall(_.satisfy)
   }
 }
 
@@ -166,3 +166,5 @@ object AsSpecificAsCondition {
 
   case class Explanation(text: String, satisfy: Boolean) extends AsSpecificAsCondition
 }
+
+case object Derived

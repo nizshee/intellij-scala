@@ -226,9 +226,9 @@ object MethodResolveProcessor {
 
 
     def addExpectedTypeProblems(eOption: Option[ScType] = expectedOption()): Unit = {
-      if (eOption.isEmpty) return
+      if (eOption.isEmpty && handler.isEmpty) return
 
-      val expected = eOption.get
+      val expected = eOption.getOrElse(Any)
       val retType: ScType = element match {
         case f: ScFunction if f.paramClauses.clauses.length > 1 &&
           !f.paramClauses.clauses.apply(1).isImplicit =>
@@ -497,7 +497,18 @@ object MethodResolveProcessor {
           }
           val inner = handler.map(_.substitutor)
           uSubst.getSubstitutor(notNonable = false, handler = inner) match {
-            case Some(_) =>
+            case Some(su) =>
+              handler.map { h =>
+                val maybeTypeParameters: Option[Seq[((String, Long), Boolean)]] = element match {
+                  case t: ScTypeParametersOwner => Some(t.typeParameters.map(p => p.nameAndId -> p.isContravariant))
+                  case p: PsiTypeParameterListOwner => Some(p.getTypeParameters.map(p => p.nameAndId -> false))
+                  case _ => None
+                }
+                maybeTypeParameters.foreach(_.filterNot(n => su.tvMap.contains(n._1)).foreach { case (name, isContrvariant) =>
+                  inner.foreach(_ + name)
+                  inner.foreach(_.addType(if (isContrvariant) Any else Nothing))
+                })
+              }
               handler.foreach(_.addRestrictions(inner.get.result))
               result
             case _ =>

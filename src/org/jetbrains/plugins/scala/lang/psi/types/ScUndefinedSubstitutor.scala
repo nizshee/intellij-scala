@@ -11,8 +11,10 @@ sealed trait ScUndefinedSubstitutor {
 
   case class SubstitutorWithBounds(subst: ScSubstitutor, lowers: Map[Name, ScType], upper: Map[Name, ScType])
 
-  def addLower(name: Name, _lower: ScType, additional: Boolean = false, variance: Int = -1): ScUndefinedSubstitutor
-  def addUpper(name: Name, _upper: ScType, additional: Boolean = false, variance: Int = 1): ScUndefinedSubstitutor
+  @uninstrumental("handler")
+  def addLower(name: Name, _lower: ScType, additional: Boolean = false, variance: Int = -1, handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor
+  @uninstrumental("handler")
+  def addUpper(name: Name, _upper: ScType, additional: Boolean = false, variance: Int = 1, handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor
 
   @uninstrumental("handler")
   def getSubstitutor(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[ScSubstitutor] =
@@ -103,11 +105,14 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
     }
   }
 
-  def addLower(name: Name, _lower: ScType, additional: Boolean = false, variance: Int = -1): ScUndefinedSubstitutor = {
+  @uninstrumental("handler")
+  def addLower(name: Name, _lower: ScType, additional: Boolean = false, variance: Int = -1,
+               handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor = {
     var index = 0
     val lower = (_lower match {
       case ScAbstractType(_, absLower, _) =>
         if (absLower.equiv(Nothing)) return this
+        handler.foreach(_.addLowerBound(Nothing))
         absLower //upper will be added separately
       case _ =>
         _lower.recursiveVarianceUpdateModifiable[Set[String]](Set.empty, {
@@ -127,6 +132,7 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
           case (tp, _, data) => (false, tp, data)
         }, variance)
     }).unpackedType
+    handler.foreach(_.addLowerBound(lower))
     val lMap = if (additional) lowerAdditionalMap else lowerMap
     lMap.get(name) match {
       case Some(set: Set[ScType]) =>
@@ -138,14 +144,21 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
     }
   }
 
-  def addUpper(name: Name, _upper: ScType, additional: Boolean = false, variance: Int = 1): ScUndefinedSubstitutor = {
+  @uninstrumental("handler")
+  def addUpper(name: Name, _upper: ScType, additional: Boolean = false, variance: Int = 1,
+               handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor = {
     var index = 0
     val upper =
       (_upper match {
         case ScAbstractType(_, _, absUpper) if variance == 0 =>
-          if (absUpper.equiv(Any)) return this
+          if (absUpper.equiv(Any)) {
+            handler.foreach(_.addUpperBound(Any))
+            return this
+          }
           absUpper // lower will be added separately
-        case ScAbstractType(_, _, absUpper) if variance == 1 && absUpper.equiv(Any) => return this
+        case ScAbstractType(_, _, absUpper) if variance == 1 && absUpper.equiv(Any) =>
+          handler.foreach(_.addUpperBound(Any))
+          return this
         case _ =>
           _upper.recursiveVarianceUpdateModifiable[Set[String]](Set.empty, {
             case (ScAbstractType(_, lower, absUpper), i, data) =>
@@ -164,6 +177,7 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
             case (tp, _, data) => (false, tp, data)
           }, variance)
       }).unpackedType
+    handler.foreach(_.addUpperBound(upper))
     val uMap = if (additional) upperAdditionalMap else upperMap
     uMap.get(name) match {
       case Some(set: Set[ScType]) =>
@@ -224,26 +238,20 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
               def checkRecursive(tp: ScType): Boolean = {
                 tp.recursiveUpdate {
                   case tpt: TypeParameterType =>
-                    handler.foreach { h =>
-                      h.log("checkRecursive - typePatameterType - skip")
-                    }
                     val otherName = tpt.nameAndId
                     if (additionalNames.contains(otherName)) {
                       res = true
-                      solve(otherName, visited + name) match {
+                      solve(otherName, visited + name) match { // TODO? always None
                         case None if !notNonable => return false
                         case _ =>
                       }
                     }
                     (false, tpt)
                   case UndefinedType(tpt, _) =>
-                    handler.foreach { h =>
-                      h.log("checkRecursive - undefinedType - skip")
-                    }
                     val otherName = tpt.nameAndId
                     if (names.contains(otherName)) {
                       res = true
-                      solve(otherName, visited + name) match {
+                      solve(otherName, visited + name) match { // TODO? always None
                         case None if !notNonable => return false
                         case _ =>
                       }
@@ -257,23 +265,18 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
               while (seqIterator.hasNext) {
                 val p = seqIterator.next()
                 if (!checkRecursive(p)) {
-                  handler.foreach { h =>
-                    h.log("!checkRecursive")
-                  }
                   tvMap += ((name, Nothing))
                   return None
                 }
               }
-              if (set.nonEmpty) { // TODO? in lower more cases
+              if (set.nonEmpty) {
                 val subst = if (res) ScSubstitutor(tvMap) else ScSubstitutor.empty
                 var lower: ScType = Nothing
                 val setIterator = set.iterator
                 while (setIterator.hasNext) {
                   lower = lower.lub(subst.subst(setIterator.next()), checkWeak = true) // TODO? where is dependence on previous substitutions?
                 }
-                handler.foreach { h =>
-                  h.log(s"lower type is $lower")
-                }
+                handler.foreach(_.log(s"lower type is $lower"))
                 lMap += ((name, lower))
                 tvMap += ((name, lower))
               }
@@ -295,26 +298,20 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
               def checkRecursive(tp: ScType): Boolean = {
                 tp.recursiveUpdate {
                   case tpt: TypeParameterType =>
-                    handler.foreach { h =>
-                      h.log("checkRecursive - typeParameterType - skip")
-                    }
                     val otherName = tpt.nameAndId
                     if (additionalNames.contains(otherName)) {
                       res = true
-                      solve(otherName, visited + name) match {
+                      solve(otherName, visited + name) match { // TODO? always None
                         case None if !notNonable => return false
                         case _ =>
                       }
                     }
                     (false, tpt)
                   case UndefinedType(tpt, _) =>
-                    handler.foreach { h =>
-                      h.log("checkRecursive - undefinedType - skip")
-                    }
                     val otherName = tpt.nameAndId
                     if (names.contains(otherName)) {
                       res = true
-                      solve(otherName, visited + name) match {
+                      solve(otherName, visited + name) match { // TODO? always None
                         case None if !notNonable => return false
                         case _ =>
                       }
@@ -328,9 +325,6 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
               while (seqIterator.hasNext) {
                 val p = seqIterator.next()
                 if (!checkRecursive(p)) {
-                  handler.foreach { h =>
-                    h.log("!checkRecursive")
-                  }
                   tvMap += ((name, Nothing))
                   return None
                 }
@@ -414,11 +408,15 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
 class ScMultiUndefinedSubstitutor(val subs: Seq[ScUndefinedSubstitutor]) extends ScUndefinedSubstitutor {
   def copy(subs: Seq[ScUndefinedSubstitutor]) = new ScMultiUndefinedSubstitutor(subs)
 
-  override def addLower(name: (String, Long), _lower: ScType, additional: Boolean, variance: Int): ScUndefinedSubstitutor =
-    copy(subs.map(_.addLower(name, _lower, additional, variance)))
+  @uninstrumental("handler")
+  override def addLower(name: (String, Long), _lower: ScType, additional: Boolean, variance: Int,
+                        handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor =
+    copy(subs.map(_.addLower(name, _lower, additional, variance, handler = handler)))
 
-  override def addUpper(name: (String, Long), _upper: ScType, additional: Boolean, variance: Int): ScUndefinedSubstitutor =
-    copy(subs.map(_.addUpper(name, _upper, additional, variance)))
+  @uninstrumental("handler")
+  override def addUpper(name: (String, Long), _upper: ScType, additional: Boolean, variance: Int,
+                        handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor =
+    copy(subs.map(_.addUpper(name, _upper, additional, variance, handler = handler)))
 
   @uninstrumental("handler")
   override def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] = {

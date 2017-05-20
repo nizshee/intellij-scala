@@ -93,26 +93,26 @@ object DCTreeStructureConformance {
       value.condition match {
         case _: Simple =>
         case Special(left, right) =>
-          list.add(new RelationNode(RelationValue(left)))
-          list.add(new RelationNode(RelationValue(right)))
+          left.foreach(c => list.add(new RelationNode(RelationValue(c))))
+          right.foreach(c => list.add(new RelationNode(RelationValue(c))))
       }
       list
     }
 
     override def update(presentationData: PresentationData): Unit = {
       val text = value.condition match {
-        case Simple(_, restriction) if restriction => "equivalent [restriction]"
-        case Simple(_, _) => "equivalent"
-        case Special(_, _) => "if both"
+        case Simple(_) => "equivalent"
+        case Special(_, _) => "special case of equivalence"
       }
       presentationData.setPresentableText(text)
+      presentationData.setTooltip(getTip(value.condition))
       if (!value.condition.satisfy)
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
 
     private def getTip(condition: ECondition) = condition match {
       case _: Simple => ""
-      case _: Special => "special case for undefined types"
+      case _: Special => "plugin: Special case of equivalence for undefined types."
     }
   }
 
@@ -159,7 +159,7 @@ object DCTreeStructureConformance {
           c.lConfitions.foreach(v => list.add(new CConditionNode(CConditionValue(v))))
         case c: CCondition.UndefinedLeft =>
           c.uConditions.foreach(v => list.add(new CConditionNode(CConditionValue(v))))
-        case c: BaseClass =>
+        case c: BaseType =>
         case c: ExistentialLeft =>
         case c: FromNothing =>
         case c: FromNull =>
@@ -178,7 +178,7 @@ object DCTreeStructureConformance {
       val data = condition.v match {
         case c: CCondition.Equivalent =>
           s"${c.equivalence.right} conforms to ${c.equivalence.left} if they are equivalent"
-        case c: CCondition.BaseClass =>
+        case c: CCondition.BaseType =>
           s"${c.right} is subclass of ${c.left}"
         case c: CCondition.FromNothing =>
           s"Nothing is always confroms to ${c.left}"
@@ -190,32 +190,34 @@ object DCTreeStructureConformance {
           s"transitive ${c.right} <: ${c.middle} <: ${c.left}"
         case c: CCondition.Projection =>
           s"conforms as projections if ${c.conforms.right} <: ${c.conforms.left}"
-        case c: CCondition.Method =>
-          s"same arguments and return types conform" + (if (!c.sameLen) " [different arguments count]" else "")
         case c: CCondition.TypeUpper =>
           s"${c.upper} is upper bound for ${c.`type`}"
         case c: CCondition.TypeLower =>
           s"${c.lower} is lower bound for ${c.`type`}"
         case c: CCondition.UndefinedLeft =>
-          s"${c.right} should conform to upper bound of undefined ${c.left}"
+          s"${c.right} should conform to upper bound of undefined ${c.left} <: ${c.upper}"
         case c: CCondition.UndefinedRight =>
-          s"lower bound of undefined ${c.right} should conform to ${c.left}"
+          s"lower bound of undefined ${c.lower} <: ${c.right} should conform to ${c.left}"
         case c: CCondition.FromNull =>
           s"${c.left} is conforms to AnyRef"
         case c: CCondition.RestrictionLeft =>
-          s"restriction ${c.right} <: ${c.name._1}"
+          s"[restriction] ${c.right} <: ${c.name._1}"
         case c: CCondition.RestrictionRight =>
-          s"restriction ${c.name._1} <: ${c.left}"
+          s"[restriction] ${c.name._1} <: ${c.left}"
         case c: CCondition.CompoundRight =>
           s"if conforms at least one"
         case c: CCondition.CompoundLeft =>
           s"if conforms all"
         case c: CCondition.ExistentialRight =>
           s"if skolemization conforms"
+        case c: CCondition.ExistentialLeft =>
+          s"if ${c.right} conforms to any type instance"
+        case c: CCondition.Method =>
+          s"same arguments and return types conform" + (if (!c.sameLen) " [different arguments count]" else "")
+        case c: CCondition.Polymorphic =>
+          ""
         case c: CCondition.Todo =>
           s"todo: ${c.reason}"
-        case c: CCondition.ExistentialLeft => ???
-        case c: CCondition.Polymorphic => ???
       }
       val msg = condition.v.msg
       presentationData.setTooltip(getTip(condition.v))
@@ -226,55 +228,62 @@ object DCTreeStructureConformance {
 
     private val conforms: String = "<plaintext><:</plaintext>"
     private val equiv: String = "<plaintext>=:</plaintext>"
-    private val conformance: String = "\n" +
-      """<a href="url">https://www.scala-lang.org/files/archive/spec/2.11/03-types.html#conformance</a>"""
 
     private def getTip(condition: CCondition): String = condition match {
       case _: Projection =>
-        """A type projection T#t conforms to U#t if T conforms to U.""" + conformance
+        """A type projection T#t conforms to U#t if T conforms to U."""
       case _: Transitive =>
-        s"""The conformance relation ($conforms) is the smallest transitive relation that satisfies the conditions.""" +
-          conformance
+        s"""The conformance relation ($conforms) is the smallest transitive relation that satisfies the conditions."""
       case _: TypeUpper =>
-        """A type variable or abstract type t conforms to its upper bound and its lower bound conforms to t.""" + conformance
+        """A type variable or abstract type t conforms to its upper bound and its lower bound conforms to t."""
       case _: TypeLower =>
-        """A type variable or abstract type t conforms to its upper bound and its lower bound conforms to t.""" + conformance
+        """A type variable or abstract type t conforms to its upper bound and its lower bound conforms to t."""
       case _: Equivalent =>
-        s"""Conformance includes equivalence. If T $equiv U then T $conforms U.""" + conformance
+        s"""Conformance includes equivalence. If T $equiv U then T $conforms U."""
       case _: ToAny =>
-        s"""For every value type T, scala.Nothing $conforms T $conforms scala.Any.""" + conformance
+        s"""For every value type T, scala.Nothing $conforms T $conforms scala.Any."""
       case _: FromNothing =>
-        s"""For every value type T, scala.Nothing $conforms T $conforms scala.Any.""" + conformance
+        s"""For every value type T, scala.Nothing $conforms T $conforms scala.Any."""
       case _: FromNull =>
-        """"""
-      case _: BaseClass =>
-        """"""
-      case _: Method =>
-        """"""
+        """For every class type T such that T <: scala.AnyRef one has scala.Null <: T."""
+      case _: BaseType =>
+        """A class type or parameterized type conforms to any of its base-types."""
       case _: RestrictionLeft =>
-        """"""
+        """plugin: Uses to collect restrictions for some abstract types."""
+      case _: RestrictionRight =>
+        """plugin: Uses to collect restrictions for some abstract types."""
       case _: CompoundRight =>
-        """"""
+        """A compound type T1 with … with Tn {R} conforms to each of its component types Ti."""
       case _: CompoundLeft =>
-        """"""
+        s"""If T $conforms Ui for all i and for every binding d of a type or value x in R
+           |there exists a member binding of x in T which subsumes d,
+           |then T conforms to the compound type U1 with … with Un {R}.""".stripMargin
       case _: ExistentialRight =>
-        """"""
+        """The existential type T forSome {Q} conforms to U if its skolemization conforms to U."""
+      case _: ExistentialLeft =>
+        """The type T conforms to the existential type U forSome {Q} if T conforms to one of the type instances of U forSome {Q}."""
       case _: Parametrize =>
         s"""A parameterized type T[T1 , … , Tn] conforms to T[U1 , … , Un] if the following three conditions hold for all i:
           |
           |1. If the i'th type parameter of T is declared covariant, then Ti $conforms Ui.
           |2. If the i'th type parameter of T is declared contravariant, then Ui $conforms Ti.
-          |3. If the i'th type parameter of T is declared neither covariant nor contravariant, then Ui $equiv Ti.""".stripMargin + conformance
-      case _: Todo =>
-        """Not implemented yet."""
+          |3. If the i'th type parameter of T is declared neither covariant nor contravariant, then Ui $equiv Ti.""".stripMargin
       case _: UndefinedLeft =>
-        """"""
-      case _: ExistentialLeft =>
-        """"""
-      case _: Polymorphic =>
-        """"""
+        s"""undefined $conforms T  and T $conforms undefined
+           |
+           |plugin: Added information about context of application like upper and lower types.""".stripMargin
       case _: UndefinedRight =>
-        """"""
+        s"""undefined $conforms T  and T $conforms undefined
+           |
+           |plugin: Added information about context of application like upper and lower types.""".stripMargin
+      case _: Method =>
+        s"""If Ti $equiv Ti′ for all i and U conforms to U′ then the method type (p1:T1,…,pn:Tn)U conforms to (p1′:T1′,…,pn′:Tn′)U′."""
+      case _: Polymorphic =>
+        s"""The polymorphic type [L1 $conforms a1 $conforms U1,…,Ln $conforms an $conforms Un] conforms
+           |to the polymorphic type [L1′ $conforms a1 $conforms U1′,…,Ln′ $conforms an $conforms Un′]T′ if,
+           |assuming L1′ $conforms a1 $conforms U1′,…,Ln′ $conforms an $conforms Un′ one has T $conforms T′ and Li $conforms Li′ and Ui′ $conforms Ui for all i.""".stripMargin
+      case _: Todo =>
+      """Not implemented yet."""
 
     }
   }

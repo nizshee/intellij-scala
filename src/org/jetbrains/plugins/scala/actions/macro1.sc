@@ -9,6 +9,12 @@ class A(var a: Int) {
   a += 1
 }
 
+@identity
+class C(o: Option[Int]) {
+  o.exists(_ > 0)
+  o.contains(1)
+}
+
 // присвоение не позицонного оргумента
 
 class B(var b: Int) extends A(b) {

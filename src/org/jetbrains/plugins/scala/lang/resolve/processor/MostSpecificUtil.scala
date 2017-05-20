@@ -220,7 +220,16 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
         }
 
         var u = conformance._2
-        if (!conformance._1) return false
+        if (!conformance._1) {
+          handler.foreach { h =>
+            conf.get match {
+              case Left(args) =>
+                h.addWeight(r1.element, r2.element, AsSpecificAsCondition.Method(t1, t2, args, Seq()))
+              case _ => // TODO?
+            }
+          }
+          return false
+        }
 
         t2 match {
           case ScTypePolymorphicType(_, typeParams) =>
@@ -316,7 +325,10 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
   private def relativeWeight[T](r1: InnerScalaResolveResult[T], r2: InnerScalaResolveResult[T],
                                 checkImplicits: Boolean): Int = {
     val s1 = if (isAsSpecificAs(r1, r2, checkImplicits)) 1 else 0
-    val s2 = if (isDerived(getClazz(r1), getClazz(r2))) 1 else 0
+    val s2 = if (isDerived(getClazz(r1), getClazz(r2))) {
+      handler.foreach(_.addDerived(r1.element, r2.element))
+      1
+    } else 0
     s1 + s2
   }
 
@@ -334,10 +346,6 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
     }
     val weightR1R2 = relativeWeight(r1, r2, checkImplicits)
     val weightR2R1 = relativeWeight(r2, r1, checkImplicits)
-    handler.foreach { h =>
-      h.addWeight(r1.element, r2.element, weightR1R2)
-      h.addWeight(r2.element, r1.element, weightR2R1)
-    }
     weightR1R2 > weightR2R1
   }
 
@@ -345,24 +353,24 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
                                      noImplicit: Boolean): Option[InnerScalaResolveResult[T]] = {
     def calc(checkImplicits: Boolean): Option[InnerScalaResolveResult[T]] = {
       val a1iterator = applicable.iterator
-      var res = Option.empty[InnerScalaResolveResult[T]]
+      var res = handler.map(_ => Option.empty[InnerScalaResolveResult[T]])
       while (a1iterator.hasNext) {
         val a1 = a1iterator.next()
         var break = false
         val a2iterator = applicable.iterator
         while (a2iterator.hasNext && (!break || handler.nonEmpty)) {
-          // TODO? all weights
           val a2 = a2iterator.next()
+          handler.foreach(_.log("!!!" + a1.element.getText + " " + a2.element.getText))
           if (a1 != a2 && !isMoreSpecific(a1, a2, checkImplicits)) break = true
         }
         if (!break) {
-          if (handler.isEmpty) return Some(a1)
-          else res = Some(a1)
+          if (handler.nonEmpty) handler.foreach(_ => res = Some(Some(a1)))
+          else return Some(a1)
         }
       }
-      res
+      if (handler.nonEmpty) return res.get
+      None
     }
-
     val result = calc(checkImplicits = false)
     if (!noImplicit && result.isEmpty) calc(checkImplicits = true)
     else result

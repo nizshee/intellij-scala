@@ -33,7 +33,7 @@ object DCTreeStructureSubstitutor {
 
     override def update(presentationData: PresentationData): Unit = {
       if (value.restrictions.size == 1) presentationData.setPresentableText("restrictions")
-      else presentationData.setPresentableText("variants")
+      else presentationData.setPresentableText("restriction variants")
 
       if (value.restrictions.size == 1 && value.restrictions.head.exists(_.`type`.isEmpty))
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)

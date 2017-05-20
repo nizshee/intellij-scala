@@ -232,8 +232,8 @@ object Compatibility {
               val cHandler = handler.map(_.handler)
               typeSystem.conformance.conformsInner(paramType, exprType,
                 substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = cHandler)
-              h + h.Arg(param.name, exprType, paramType,
-                Relation.Conformance(exprType, paramType, cHandler.get.conditions).conditions)
+              h + h.Arg(param.name, paramType, exprType,
+                Relation.Conformance(paramType, exprType, cHandler.get.conditions).conditions)
             }
             val conforms = exprType.weakConforms(paramType)
             matched ::=(param, expr.expr)

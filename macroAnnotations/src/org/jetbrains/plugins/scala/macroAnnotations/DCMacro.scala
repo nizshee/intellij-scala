@@ -95,6 +95,26 @@ object generateInstrumentationMacro {
         methods.values.toSet
     }
 
+    def parameterContainsInstrumentation(tree: Tree, instrumentation: Set[String]): Boolean =  tree match {
+      case Ident(TermName(name)) => instrumentation(name)
+      case AssignOrNamedArg(_, Ident(TermName(name))) => instrumentation(name)
+      case Apply(Select(Ident(TermName(name)), _), _) => instrumentation(name)
+      case AssignOrNamedArg(_, Apply(Select(Ident(TermName(name)), _), _)) => instrumentation(name)
+      case _ => false
+    }
+
+    def trueExpression(instrumentation: Set[String], tree: Tree): Boolean = tree match {
+      case Select(Ident(TermName(name)), TermName("isEmpty")) => instrumentation(name)
+      case Apply(Select(Ident(TermName(name)), TermName("forall")), _) => instrumentation(name)
+      case _ => false
+    }
+
+    def falseExpression(instrumentation: Set[String], tree: Tree): Boolean = tree match {
+      case Select(Ident(TermName(name)), TermName("nonEmpty")) => instrumentation(name)
+      case Apply(Select(Ident(TermName(name)), TermName("exists")), _) => instrumentation(name)
+      case _ => false
+    }
+
     def substitution(prev: String, next: String) = new Transformer {
       private def containsShadow(body: List[Tree]): Boolean = body.exists {
         case ValDef(_, TermName(name), _, _) => name == prev
@@ -186,26 +206,20 @@ object generateInstrumentationMacro {
           val res = super.transform(Block(nBody, tpt))
           instrumentation = pForbidden
           res
-        case Apply(Select(term, TermName("$amp$amp")), List(Select(Ident(TermName(name)), TermName("isEmpty"))))
-          if instrumentation(name) => transform(term)
-        case Apply(Select(Select(Ident(TermName(name)), TermName("isEmpty")), TermName("$amp$amp")), List(term))
-          if instrumentation(name) => transform(term)
-        case Apply(Select(term, TermName("$bar$bar")), List(Select(Ident(TermName(name)), TermName("nonEmpty"))))
-          if instrumentation(name) => transform(term)
-        case Apply(Select(Select(Ident(TermName(name)), TermName("nonEmpty")), TermName("$bar$bar")), List(term))
-          if instrumentation(name) => transform(term)
+        case Apply(Select(term, TermName("$amp$amp")), List(maybeTrue)) if trueExpression(instrumentation, maybeTrue) =>
+          transform(term)
+        case Apply(Select(maybeTrue, TermName("$amp$amp")), List(term)) if trueExpression(instrumentation, maybeTrue) =>
+          transform(term)
+        case Apply(Select(term, TermName("$bar$bar")), List(maybeFalse)) if falseExpression(instrumentation, maybeFalse) =>
+          transform(term)
+        case Apply(Select(maybeFalse, TermName("$bar$bar")), List(term)) if falseExpression(instrumentation, maybeFalse) =>
+          transform(term)
         case Apply(Select(Ident(TermName(name)), _), _) if instrumentation(name) => Literal(Constant(()))
         case a@Apply(fun, args) if a != pendingSuperCall => // pendingSuperCall matches on Apply and ruins final ast
-          val nArgs = args.filterNot {
-            case Ident(TermName(name)) => instrumentation(name)
-            case AssignOrNamedArg(_, Ident(TermName(name))) => instrumentation(name)
-            case Apply(Select(Ident(TermName(name)), _), _) => instrumentation(name)
-            case AssignOrNamedArg(_, Apply(Select(Ident(TermName(name)), _), _)) => instrumentation(name)
-            case _ => false
-          }
+          val nArgs = args.filterNot(parameterContainsInstrumentation(_, instrumentation))
           super.transform(Apply(fun, nArgs))
-        case If(Select(Ident(TermName(name)), TermName("isEmpty")), tr, _) if instrumentation(name) => transform(tr)
-        case If(Select(Ident(TermName(name)), TermName("nonEmpty")), _, tr) if instrumentation(name) => transform(tr)
+        case If(maybeTrue, tr, _) if trueExpression(instrumentation, maybeTrue) => transform(tr)
+        case If(maybeFalse, _, tr) if falseExpression(instrumentation, maybeFalse) => transform(tr)
         case TermName(name) if instrumentation(name) =>
           c.abort(c.enclosingPosition, s"There is a not cut forbidden name $name.")
         case _ => super.transform(tree)
@@ -254,13 +268,7 @@ object generateInstrumentationMacro {
           instrumentation = pForbidden
           res
         case a@Apply(tName, args) if a != pendingSuperCall =>
-          val contains = args.exists {
-            case Ident(TermName(name)) => instrumentation(name)
-            case AssignOrNamedArg(_, Ident(TermName(name))) => instrumentation(name)
-            case Apply(Select(Ident(TermName(name)), _), _) => instrumentation(name)
-            case AssignOrNamedArg(_, Apply(Select(Ident(TermName(name)), _), _)) => instrumentation(name)
-            case _ => false
-          }
+          val contains = args.exists(parameterContainsInstrumentation(_, instrumentation))
           var isClass = false
           val nName =
             if (contains) tName match {

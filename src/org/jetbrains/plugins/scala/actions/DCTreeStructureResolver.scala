@@ -99,9 +99,15 @@ object DCTreeStructureResolver {
       val name = f.name
       val ty = f.getType().getOrNothing
       (if (f.typeParameters.nonEmpty) s"[${f.typeParameters.map(_.name).mkString(", ")}] " else "") + s"$name: $ty"
-    case p: ScPrimaryConstructor => "???2"
-    case m: PsiMethod => "???3"
-    case refPatt: ScReferencePattern => refPatt.getParent.getParent match { // TODO temroary
+    case p: ScPrimaryConstructor => s"${p.getName}: ${p.polymorphicType}"
+    case m: PsiMethod =>
+      val name = m.getName
+      val tParams = if (m.getTypeParameterList.getTypeParameters.nonEmpty)
+        "[" + m.getTypeParameterList.getTypeParameters.map(_.getName).mkString(", ") + "] " else ""
+      val r = m.getReturnType
+      val params = "(" + m.getParameterList.getParameters.map(p => s"${p.getName}: ${p.getType}").mkString(", ") + ")"
+      s"$tParams$name: $params => $r"
+    case refPatt: ScReferencePattern => refPatt.getParent.getParent match {
       case pd: ScPatternDefinition if PsiTreeUtil.isContextAncestor(pd, el, true) =>
         val name = pd.declaredNames.headOption.getOrElse("unknown")
         val ty = pd.getType().getOrNothing
@@ -112,8 +118,8 @@ object DCTreeStructureResolver {
         s"$name.apply: $ty"
       case _ => "unknown"
     }
-    case typed: ScTypedDefinition => "???5"
-    case f: PsiField => "???6"
+    case typed: ScTypedDefinition => s"${typed.name}: ${typed.getType().getOrNothing}"
+    case f: PsiField => s"${f.getName}: ${f.getType}"
     case _ => "unknown"
   }
 
@@ -123,12 +129,13 @@ object DCTreeStructureResolver {
   case class WeightsValue(weights: Map[PsiNamedElement, DCHandler.Resolver#Weight])
 
   class CandidateNode(value: CandidateValue)(implicit project: Project) extends AbstractPsiBasedNode[CandidateValue](project, value, ViewSettings.DEFAULT) {
-    private val greaterWeight = value.candidate.weights.values.forall(w => w.v > w.opposite)
+    private val greaterWeight = value.candidate.weights.values.forall(_.wins)
     private val restictionsHaveSolution = value.candidate.restrictions.exists(_.forall(_.`type`.nonEmpty)) || value.candidate.restrictions.isEmpty
     private val conditionsExists = value.candidate.args.forall(_.conditions.exists(_.satisfy))
     private val problems = value.candidate.rr.iterator.flatMap(_.problems).toSeq.filterNot {
       case ExpectedTypeMismatch => true
       case _: TypeMismatch => true
+      case WrongTypeParameterInferred => true
       case _ => false
     }
 
@@ -142,7 +149,9 @@ object DCTreeStructureResolver {
           case ExpansionForNonRepeatedParameter(_) => "Expansion for non-repeated parameter"
           case PositionalAfterNamedArgument(_) => "Positional after named argument"
           case ParameterSpecifiedMultipleTimes(_) => "Parameter specified multiple times"
-          case _ => "applicable problem"
+          case MissedValueParameter(p) =>
+            "Unspecified value parameter: " + p.name + ": " + p.paramType.presentableText
+          case _ => "Applicable problem"
         }
         texts.foreach(text => list.add(new TextNode(TextValue(text, satisfy = false))))
       }
@@ -178,7 +187,7 @@ object DCTreeStructureResolver {
     }
 
     override def update(presentationData: PresentationData): Unit = {
-      val enough = weight.weights.values.forall(w => w.v > w.opposite)
+      val enough = weight.weights.values.forall(_.wins)
       presentationData.setPresentableText("relative weights")
       if (!enough)
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)

@@ -148,47 +148,21 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
     if (editor.getSelectionModel.hasSelection) {
       val selectionStart = editor.getSelectionModel.getSelectionStart
       val selectionEnd = editor.getSelectionModel.getSelectionEnd
-      val opt = ScalaRefactoringUtil.getExpression(project, editor, file, selectionStart, selectionEnd)
-
 
       val elements = ScalaRefactoringUtil.selectedElements(editor, file.asInstanceOf[ScalaFile], trimComments = false)
       println(elements)
 
-      // TODO need to handle arguments somehow, not only functions
       elements.foreach { // TODO how to handle dsl style like a + b
-        case e: ScReferenceExpression =>
-          processReferenceExpression(e)
-        case e: ScExpression =>
-          e.getContext.getContext match {
-            case m: ScMethodCall =>
-              m.deepestInvokedExpr match {
-                case r: ScReferenceElement =>
-                  val rrOption = r.bind()
-                  rrOption.flatMap(_.innerResolveResult).orElse(rrOption) match {
-                    case Some(rr) => processScResolveRes(m.args.exprs, rr, m.getResolveScope)
-                    case _ =>
-                  }
-              }
-            case c => println(s"not method - $c")
-          }
-          println(e)
-        case m: ScMethodCall =>
-          m.deepestInvokedExpr match {
-            case r: ScReferenceElement =>
-              val rrOption = r.bind()
-              rrOption.flatMap(_.innerResolveResult).orElse(rrOption) match {
-                case Some(rr) => processScResolveRes(m.args.exprs, rr, m.getResolveScope)
-                case _ =>
-              }
-            case _ =>
-          }
+        case expr: ScReferenceExpression => processReferenceExpression(expr)
+        case expr: ScExpression => processExpression(expr)
         case _ =>
-      }
+          ScalaRefactoringUtil.getExpression(project, editor, file, selectionStart, selectionEnd) match {
+            case Some((expr, _)) => processExpression(expr)
+            case _ => showHint("No expression found.")
+          }
 
-//      opt match {
-//        case Some((expr, _)) => processScExpr(expr)
-//        case _ => showHint("No expression found.")
-//      }
+          println(e)
+      }
     } else {
       println("TODO")
       val offset = editor.getCaretModel.getOffset
@@ -206,67 +180,39 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
   private def processReferenceExpression(reference: ScReferenceExpression)(implicit editor: Editor) = {
     implicit val project: Project = editor.getProject
-    val handler = new DCHandler.Resolver("", true) // TODO? uncomment
-    ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
-//    ReferenceExpressionResolver.resolve(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
-
-    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2, handler.ret))
-    println(values)
-    showPopup(new DCTreeStructureResolver(values))
-  }
-
-  // TODO check how works with implicits
-  private def processScResolveRes(args: Seq[ScExpression], rr: ScalaResolveResult, scope: GlobalSearchScope) = {
-    val handler = new DCHandler.Compatibility("", true)
-
-    val argExprs = args.map(Compatibility.Expression.apply) // TODO how to handle many parrents?
-    val element = rr.getActualElement
-    val s = rr.substitutor
-    val subs = MethodResolveProcessor.undefinedSubstitutor(element, s, false, Seq()) // TODO maybe typeArgElements is necessary
-    println(s"begining subs is $subs")
-//    val c = Compatibility.compatible(element, subs, List(argExprs), false, scope, false, handler = Some(handler))
-    println(handler.args)
-    val sHandler = new DCHandler.Substitutor("", true)
-//    c.undefSubst.getSubstitutorWithBounds(notNonable = true, handler = Some(sHandler)) match {
-//      case Some((substitutor, _, _)) =>
-//        println(substitutor)
-//      case None =>
-//    }
-//
-//    c.problems.foreach { p =>
-//      println(p.description)
-//    }
+    val handler = new DCHandler.Resolver("", true)
+    // TODO? uncomment
+//    val r = ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
+//    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2, handler.ret))
+//    println(values)
+//    showPopup(new DCTreeStructureResolver(values))
   }
 
 
-  private def processScExpr(e: ScExpression)(implicit editor: Editor): Unit = {
+  private def processExpression(e: ScExpression)(implicit editor: Editor): Unit = {
     implicit val typeSystem: TypeSystem = e.typeSystem
     implicit val project: Project = editor.getProject
     val handler = new DCHandler.Conformance("", true)
-
-    val leftOption = e.expectedType()
-    val rightTypeResult = e.getNonValueType().map(_.inferValueType)
-    leftOption match {
-      case Some(left) => // TODO get fresh type variable if expected not found
-        rightTypeResult match {
-          case Success(right, _) =>
-            handler.log("Action fired on:")
-            handler.logtn(left, right)
-            val inner = handler.inner
-            val (canConform, subst) = Conformance.conformsInner(left, right/*, handler = Some(inner)*/)
-            val conformance = Relation.Conformance(left, right, inner.conditions)
-            val values = Seq(DCTreeStructureConformance.Value(if (true) DebugConformanceAdapter(conformance) else conformance))
-            showPopup(new DCTreeStructureConformance(values))
-            println(inner.conditions)
-            if (canConform) {
-              handler.logn("can conform")
-            }
-            else handler.logn("can't conform")
-          case Failure(cause, _) => showHint(s"Can't derive type: $cause")
-        }
-      case None => showHint("No expected type found.")
-    }
-
+    // TODO? uncomment
+//    val leftOption = e.expectedType()
+//    val rightTypeResult = e.getNonValueType().map(_.inferValueType)
+//    leftOption match {
+//      case Some(left) => // TODO get fresh type variable if expected not found
+//        rightTypeResult match {
+//          case Success(right, _) =>
+//            handler.log("Action fired on:")
+//            handler.logtn(left, right)
+//            val inner = handler.inner
+//            val r = Conformance.conformsInner$I(left, right, handler = Some(inner))
+//            println(r)
+//            val conformance = Relation.Conformance(left, right, inner.conditions)
+//            val values = Seq(DCTreeStructureConformance.Value(if (true) DebugConformanceAdapter(conformance) else conformance))
+//            showPopup(new DCTreeStructureConformance(values))
+//            println(inner.conditions)
+//          case Failure(cause, _) => showHint(s"Can't derive type: $cause")
+//        }
+//      case None => showHint("No expected type found.")
+//    }
 
   }
 }

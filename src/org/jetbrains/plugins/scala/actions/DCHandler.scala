@@ -9,6 +9,14 @@ import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
   * Created by user on 4/10/17.
   */
 protected class DCHandler(delimeter: String, debug: Boolean) {
+  private var _corrupted: Boolean = false
+
+  def corrupt(): Unit = _corrupted = true
+
+  def corrupted: Boolean = _corrupted
+
+  def clean(): Unit = _corrupted = false
+
   def log(any: Any): Unit = if (debug) println(delimeter + any)
   def logn(any: Any): Unit = if (debug) {
     println(delimeter + any)
@@ -23,11 +31,6 @@ object DCHandler {
     private var _compound: Option[CCondition.CompoundLeft] = None
     private var _conditions: Seq[CCondition] = Seq()
     private var _variances: Seq[CCondition.Variance] = Seq()
-    private var _corrupted: Boolean = false
-
-    def corrupt(): Unit = _corrupted = true
-
-    def corrupted: Boolean = _corrupted
 
     def addCompound(compound: ScCompoundType, right: ScType): Unit = _compound =
       Some(CCondition.CompoundLeft(compound, right, Map(), Map(), Seq()))
@@ -83,8 +86,8 @@ object DCHandler {
       logn("right visit " + any)
     }
 
-    def clean(): Unit = {
-      _corrupted = false
+    override def clean(): Unit = {
+      super.clean()
       _compound = None
       _conditions = Seq.empty
       _variances = Seq.empty
@@ -130,6 +133,14 @@ object DCHandler {
     private var _restrictions: Seq[Restriction] = Seq.empty
     private var _follows: Seq[Seq[Substitutor#Restriction]] = Seq.empty
 
+    private var _upperBound: ScType = Any
+    private var _lowerBound: ScType = Nothing
+
+    def addUpperBound(bound: ScType): Unit = _upperBound = bound
+    def addLowerBound(bound: ScType): Unit = _lowerBound = bound
+    def upperBound: ScType = _upperBound
+    def lowerBound: ScType = _lowerBound
+
     def +(follow: Seq[Substitutor#Restriction]): Unit = {
       _follows :+= follow
     }
@@ -172,11 +183,14 @@ object DCHandler {
 
   class Resolver(delimter: String, debug: Boolean) extends DCHandler(delimter, debug) {
 
-    case class Weight(v: Int, opposite: Int, asSpecificAs: Option[AsSpecificAsCondition], derived: Option[Nothing])
+    case class Weight(opposite: Int, asSpecificAs: Option[AsSpecificAsCondition], derived: Option[Derived.type]) {
+      def wins: Boolean = opposite < v
+      def v: Int = asSpecificAs.map(v => if (v.satisfy) 1 else 0).getOrElse(0) + derived.map(_ => 1).getOrElse(0)
+    }
     case class Candidate(rr: Option[ScalaResolveResult],
                          weights: Map[PsiNamedElement, Weight],
-                         args: Seq[DCHandler.Compatibility#Arg],
-                         restrictions: Seq[Seq[DCHandler.Substitutor#Restriction]])
+                         args: Seq[Compatibility#Arg],
+                         restrictions: Seq[Seq[Substitutor#Restriction]])
     case class Ret(expextedType: ScType,
                    actualType: ScType,
                    conditions: Seq[CCondition],
@@ -231,35 +245,37 @@ object DCHandler {
       }
     }
 
-    def addWeight(left: PsiNamedElement, right: PsiNamedElement, v: Int): Unit = { // TODO? remove
-      val _left = resolve(left)
-      val _right = resolve(right)
-      val candidate = _candidates.getOrElse(_left, Candidate(None, Map.empty, Seq.empty, Seq.empty))
-      val weight = candidate.weights.getOrElse(_right, Weight(0, 0, None, None))
-      _candidates += _left -> candidate.copy(
-        weights = candidate.weights.updated(_right, weight.copy(v = v))
-      )
-
-      val rCandidate = _candidates.getOrElse(_right, Candidate(None, Map.empty, Seq.empty, Seq.empty))
-      val rWeight = rCandidate.weights.getOrElse(_left, Weight(0, 0, None, None))
-      _candidates += _right -> rCandidate.copy(
-        weights = rCandidate.weights.updated(_left, rWeight.copy(opposite = v))
-      )
-    }
-
     def addWeight(left: PsiNamedElement, right: PsiNamedElement, asSpecificAs: AsSpecificAsCondition): Unit = {
       val _left = resolve(left)
       val _right = resolve(right)
       val candidate = _candidates.getOrElse(_left, Candidate(None, Map.empty, Seq.empty, Seq.empty))
-      val weight = candidate.weights.getOrElse(_right, Weight(0, 0, None, None))
+      val weight = candidate.weights.getOrElse(_right, Weight(0, None, None))
       _candidates += _left -> candidate.copy(
         weights = candidate.weights.updated(_right, weight.copy(asSpecificAs = Some(asSpecificAs)))
       )
 
+//      val w = if (asSpecificAs.satisfy) 1 else 0
+//      log("!!! " + left.getText + " " + w)
+//      val rCandidate = _candidates.getOrElse(_right, Candidate(None, Map.empty, Seq.empty, Seq.empty))
+//      val rWeight = rCandidate.weights.getOrElse(_left, Weight(0, None, None))
+//      _candidates += _right -> rCandidate.copy(
+//        weights = rCandidate.weights.updated(_left, rWeight.copy(opposite = rWeight.opposite + w))
+//      )
+    }
+
+    def addDerived(left: PsiNamedElement, right: PsiNamedElement): Unit = {
+      val _left = resolve(left)
+      val _right = resolve(right)
+      val candidate = _candidates.getOrElse(_left, Candidate(None, Map.empty, Seq.empty, Seq.empty))
+      val weight = candidate.weights.getOrElse(_right, Weight(0, None, None))
+      _candidates += _left -> candidate.copy(
+        weights = candidate.weights.updated(_right, weight.copy(derived = Some(Derived)))
+      )
+
       val rCandidate = _candidates.getOrElse(_right, Candidate(None, Map.empty, Seq.empty, Seq.empty))
-      val rWeight = rCandidate.weights.getOrElse(_left, Weight(0, 0, None, None))
+      val rWeight = rCandidate.weights.getOrElse(_left, Weight(0, None, None))
       _candidates += _right -> rCandidate.copy(
-        weights = rCandidate.weights.updated(_left, rWeight.copy(/*opposite = rWeight.opposite + 1*/))
+        weights = rCandidate.weights.updated(_left, rWeight.copy(opposite = rWeight.opposite + 1))
       )
     }
 
@@ -276,7 +292,14 @@ object DCHandler {
       _candidates = Map.empty
     }
 
-    def candidates: List[(PsiNamedElement, Candidate)] = _candidates.toList
+    def candidates: List[(PsiNamedElement, Candidate)] =
+      _candidates.map { case (name1, v) =>
+        name1 -> v.copy(
+          weights = v.weights.map { case (name2, weight) =>
+            name2 -> weight.copy(opposite = _candidates.get(name2).flatMap(_.weights.get(name1)).map(_.v).getOrElse(0))
+          }
+        )
+      }.toList
   }
 
   type Args = Seq[DCHandler.Compatibility#Arg]
