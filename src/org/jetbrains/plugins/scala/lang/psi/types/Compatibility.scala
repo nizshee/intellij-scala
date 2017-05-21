@@ -9,7 +9,8 @@ import com.intellij.psi._
 import com.intellij.psi.impl.compiled.ClsParameterImpl
 import com.intellij.psi.search.GlobalSearchScope
 import org.jetbrains.annotations.TestOnly
-import org.jetbrains.plugins.scala.actions.{DCHandler, DebugConformanceAction, DebugConformanceAdapter, Relation}
+import org.jetbrains.plugins.scala.actions.debug_types.{DTHandler, Relation}
+import org.jetbrains.plugins.scala.actions.DebugTypesAction
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api.InferUtil
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
@@ -23,7 +24,7 @@ import org.jetbrains.plugins.scala.lang.psi.types.api.{FunctionType, UndefinedTy
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.Parameter
 import org.jetbrains.plugins.scala.lang.psi.types.result._
 import org.jetbrains.plugins.scala.lang.refactoring.util.ScalaNamesUtil
-import org.jetbrains.plugins.scala.macroAnnotations.{CachedWithRecursionGuard, ModCount, uninstrumental}
+import org.jetbrains.plugins.scala.macroAnnotations.{CachedWithRecursionGuard, ModCount, uninstrumented}
 
 import scala.collection.mutable.ArrayBuffer
 import scala.collection.{Seq, Set}
@@ -124,12 +125,12 @@ object Compatibility {
       ScalaType.designator
     }
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   def checkConformance(checkNames: Boolean,
                        parameters: Seq[Parameter],
                        exprs: Seq[Expression],
                        checkWithImplicits: Boolean,
-                       handler: Option[DCHandler.Compatibility] = None): (Boolean, ScUndefinedSubstitutor) = {
+                       handler: Option[DTHandler.Compatibility] = None): (Boolean, ScUndefinedSubstitutor) = {
     val r = checkConformanceExt(checkNames, parameters, exprs, checkWithImplicits, isShapesResolve = false, handler = handler)
     (r.problems.isEmpty, r.undefSubst)
   }
@@ -168,13 +169,13 @@ object Compatibility {
     problems
   }
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   def checkConformanceExt(checkNames: Boolean,
                           parameters: Seq[Parameter],
                           exprs: Seq[Expression],
                           checkWithImplicits: Boolean,
                           isShapesResolve: Boolean,
-                          handler: Option[DCHandler.Compatibility] = None): ConformanceExtResult = {
+                          handler: Option[DTHandler.Compatibility] = None): ConformanceExtResult = {
     ProgressManager.checkCanceled()
     var undefSubst = ScUndefinedSubstitutor()
 
@@ -263,6 +264,13 @@ object Compatibility {
               val expectedType = ScParameterizedType(seqType, Seq(param.expectedType))
 
               for (exprType <- expr.getTypeAfterImplicitConversion(checkWithImplicits, isShapesResolve, Some(expectedType)).tr) yield {
+                handler.foreach { h =>
+                  val cHandler = handler.map(_.handler)
+                  typeSystem.conformance.conformsInner(tp, exprType,
+                    substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = cHandler)
+                  h + h.Arg(param.name, tp, exprType,
+                    Relation.Conformance(tp, exprType, cHandler.get.conditions).conditions)
+                }
                 val conforms = exprType.weakConforms(tp)
                 if (!conforms) {
                   return ConformanceExtResult(Seq(TypeMismatch(expr, tp)), undefSubst, defaultParameterUsed, matched, matchedTypes)
@@ -317,6 +325,13 @@ object Compatibility {
 
                 for (exprType <- expr.getTypeAfterImplicitConversion(checkWithImplicits, isShapesResolve, Some(expectedType)).tr) yield {
                   val conforms = exprType.weakConforms(paramType)
+                  handler.foreach { h =>
+                    val cHandler = handler.map(_.handler)
+                    typeSystem.conformance.conformsInner(paramType, exprType,
+                      substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = cHandler)
+                    h + h.Arg(param.name, paramType, exprType,
+                      Relation.Conformance(paramType, exprType, cHandler.get.conditions).conditions)
+                  }
                   if (!conforms) {
                     problems ::= TypeMismatch(expr, paramType)
                   } else {
@@ -335,7 +350,7 @@ object Compatibility {
       k = k + 1
     }
 
-    if(problems.nonEmpty) return ConformanceExtResult(problems.reverse, undefSubst, defaultParameterUsed, matched, matchedTypes)
+    if (problems.nonEmpty) return ConformanceExtResult(problems.reverse, undefSubst, defaultParameterUsed, matched, matchedTypes)
 
     if (exprs.length == parameters.length) return ConformanceExtResult(Seq.empty, undefSubst, defaultParameterUsed, matched, matchedTypes)
     else if (exprs.length > parameters.length) {
@@ -348,6 +363,13 @@ object Compatibility {
       while (k < exprs.length) {
         for (exprType <- exprs(k).getTypeAfterImplicitConversion(checkWithImplicits, isShapesResolve, Some(expectedType))._1) {
           val conforms = exprType.weakConforms(paramType)
+          handler.foreach { h =>
+            val cHandler = handler.map(_.handler)
+            typeSystem.conformance.conformsInner(paramType, exprType,
+              substitutor = ScUndefinedSubstitutor(), checkWeak = true, handler = cHandler)
+            h + h.Arg(parameters.last.name, paramType, exprType,
+              Relation.Conformance(paramType, exprType, cHandler.get.conditions).conditions)
+          }
           if (!conforms) {
             return ConformanceExtResult(Seq(ElementApplicabilityProblem(exprs(k).expr, exprType, paramType)),
               undefSubst, defaultParameterUsed, matched, matchedTypes)
@@ -407,7 +429,7 @@ object Compatibility {
   }
 
   // TODO refactor a lot of duplication out of this method
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   def compatible(named: PsiNamedElement,
                  substitutor: ScSubstitutor,
                  argClauses: List[Seq[Expression]],
@@ -415,7 +437,7 @@ object Compatibility {
                  scope: GlobalSearchScope,
                  isShapesResolve: Boolean,
                  ref: PsiElement = null,
-                 handler: Option[DCHandler.Compatibility] = None): ConformanceExtResult = {
+                 handler: Option[DTHandler.Compatibility] = None): ConformanceExtResult = {
     val exprs: Seq[Expression] = argClauses.headOption match {case Some(seq) => seq case _ => Seq.empty}
     handler.foreach(_.log(s"compatibility ${named.getNode.getText}"))
     named match {

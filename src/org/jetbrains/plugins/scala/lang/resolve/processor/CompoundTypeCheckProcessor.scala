@@ -1,7 +1,7 @@
 package org.jetbrains.plugins.scala.lang.resolve.processor
 
 import com.intellij.psi._
-import org.jetbrains.plugins.scala.actions.{CCondition, DCHandler}
+import org.jetbrains.plugins.scala.actions.debug_types.{CCondition, DTHandler}
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScFieldId
 import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.ScBindingPattern
@@ -12,14 +12,14 @@ import org.jetbrains.plugins.scala.lang.psi.types._
 import org.jetbrains.plugins.scala.lang.psi.types.api.{TypeParameter, Unit}
 import org.jetbrains.plugins.scala.lang.psi.types.result.TypingContext
 import org.jetbrains.plugins.scala.lang.resolve.{ResolveTargets, StdKinds}
-import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumented
 
 /**
  * @author Alexander Podkhalyuzin
  */
-@uninstrumental("handler")
+@uninstrumented("handler")
 class CompoundTypeCheckSignatureProcessor(s: Signature, retType: ScType,
-                                 undefSubst: ScUndefinedSubstitutor, substitutor: ScSubstitutor, handler: Option[DCHandler.Conformance] = None)
+                                 undefSubst: ScUndefinedSubstitutor, substitutor: ScSubstitutor, handler: Option[DTHandler.Conformance] = None)
   extends BaseProcessor(StdKinds.methodRef + ResolveTargets.CLASS)(ScalaTypeSystem) {
 
   private val name = s.name
@@ -162,8 +162,8 @@ class CompoundTypeCheckSignatureProcessor(s: Signature, retType: ScType,
   }
 }
 
-@uninstrumental("handler")
-class CompoundTypeCheckTypeAliasProcessor(sign: TypeAliasSignature, undefSubst: ScUndefinedSubstitutor, substitutor: ScSubstitutor, handler: Option[DCHandler.Conformance] = None)
+@uninstrumented("handler")
+class CompoundTypeCheckTypeAliasProcessor(sign: TypeAliasSignature, undefSubst: ScUndefinedSubstitutor, substitutor: ScSubstitutor, handler: Option[DTHandler.Conformance] = None)
   extends BaseProcessor(StdKinds.methodRef + ResolveTargets.CLASS)(ScalaTypeSystem) {
   private val name = sign.name
 

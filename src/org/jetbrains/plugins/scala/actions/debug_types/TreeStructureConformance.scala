@@ -1,15 +1,16 @@
-package org.jetbrains.plugins.scala.actions
+package org.jetbrains.plugins.scala.actions.debug_types
 
 import java.util
 
-import com.intellij.ide.projectView.{PresentationData, ViewSettings}
 import com.intellij.ide.projectView.impl.nodes.AbstractPsiBasedNode
+import com.intellij.ide.projectView.{PresentationData, ViewSettings}
 import com.intellij.ide.util.treeView.{AbstractTreeNode, AbstractTreeStructure, NodeDescriptor}
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
 import com.intellij.psi.{PsiElement, PsiNamedElement}
-import org.jetbrains.plugins.scala.actions.CCondition._
-import org.jetbrains.plugins.scala.actions.ECondition.{Simple, Special}
+import CCondition._
+import ECondition.{Simple, Special}
+import org.jetbrains.plugins.scala.actions._
 
 
 
@@ -63,7 +64,7 @@ object DCTreeStructureConformance {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
       relation.v match {
         case r: Relation.Conformance =>
-          DebugConformanceAdapter(r).conditions.foreach { condition =>
+          DTAdapter(r).conditions.foreach { condition =>
             list.add(new CConditionNode(CConditionValue(condition)))
           }
         case r: Relation.Equivalence =>

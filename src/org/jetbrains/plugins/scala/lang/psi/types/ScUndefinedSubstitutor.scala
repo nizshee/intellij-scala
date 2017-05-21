@@ -1,9 +1,9 @@
 package org.jetbrains.plugins.scala.lang.psi.types
 
 import org.jetbrains.plugins.dotty.lang.psi.types.DottyTypeSystem
-import org.jetbrains.plugins.scala.actions.DCHandler
+import org.jetbrains.plugins.scala.actions.debug_types.DTHandler
 import org.jetbrains.plugins.scala.lang.psi.types.api._
-import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumented
 
 sealed trait ScUndefinedSubstitutor {
 
@@ -11,13 +11,13 @@ sealed trait ScUndefinedSubstitutor {
 
   case class SubstitutorWithBounds(subst: ScSubstitutor, lowers: Map[Name, ScType], upper: Map[Name, ScType])
 
-  @uninstrumental("handler")
-  def addLower(name: Name, _lower: ScType, additional: Boolean = false, variance: Int = -1, handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor
-  @uninstrumental("handler")
-  def addUpper(name: Name, _upper: ScType, additional: Boolean = false, variance: Int = 1, handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor
+  @uninstrumented("handler")
+  def addLower(name: Name, _lower: ScType, additional: Boolean = false, variance: Int = -1, handler: Option[DTHandler.Substitutor] = None): ScUndefinedSubstitutor
+  @uninstrumented("handler")
+  def addUpper(name: Name, _upper: ScType, additional: Boolean = false, variance: Int = 1, handler: Option[DTHandler.Substitutor] = None): ScUndefinedSubstitutor
 
-  @uninstrumental("handler")
-  def getSubstitutor(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[ScSubstitutor] =
+  @uninstrumented("handler")
+  def getSubstitutor(notNonable: Boolean, handler: Option[DTHandler.Substitutor] = None): Option[ScSubstitutor] =
     getSubstitutorWithBounds(notNonable, handler = handler).map(_._1)
   def getSubstitutor: Option[ScSubstitutor] = getSubstitutor(notNonable = false)
   def filter(fun: (((String, Long), Set[ScType])) => Boolean): ScUndefinedSubstitutor
@@ -27,8 +27,8 @@ sealed trait ScUndefinedSubstitutor {
   def names: Set[Name]
 
   //subst, lowers, uppers
-  @uninstrumental("handler")
-  def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])]
+  @uninstrumented("handler")
+  def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DTHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])]
 }
 
 object ScUndefinedSubstitutor {
@@ -105,9 +105,9 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
     }
   }
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   def addLower(name: Name, _lower: ScType, additional: Boolean = false, variance: Int = -1,
-               handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor = {
+               handler: Option[DTHandler.Substitutor] = None): ScUndefinedSubstitutor = {
     var index = 0
     val lower = (_lower match {
       case ScAbstractType(_, absLower, _) =>
@@ -144,9 +144,9 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
     }
   }
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   def addUpper(name: Name, _upper: ScType, additional: Boolean = false, variance: Int = 1,
-               handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor = {
+               handler: Option[DTHandler.Substitutor] = None): ScUndefinedSubstitutor = {
     var index = 0
     val upper =
       (_upper match {
@@ -199,8 +199,8 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
     upperMap.keySet ++ lowerMap.filter(_._2.exists(!_.equiv(Nothing))).keySet ++ additionalNames
   }
 
-  @uninstrumental("handler")
-  def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] = {
+  @uninstrumented("handler")
+  def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DTHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] = {
     var tvMap = Map.empty[Name, ScType]
     var lMap = Map.empty[Name, ScType]
     var uMap = Map.empty[Name, ScType]
@@ -408,18 +408,18 @@ private class ScUndefinedSubstitutorImpl(val upperMap: Map[(String, Long), Set[S
 class ScMultiUndefinedSubstitutor(val subs: Seq[ScUndefinedSubstitutor]) extends ScUndefinedSubstitutor {
   def copy(subs: Seq[ScUndefinedSubstitutor]) = new ScMultiUndefinedSubstitutor(subs)
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   override def addLower(name: (String, Long), _lower: ScType, additional: Boolean, variance: Int,
-                        handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor =
+                        handler: Option[DTHandler.Substitutor] = None): ScUndefinedSubstitutor =
     copy(subs.map(_.addLower(name, _lower, additional, variance, handler = handler)))
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   override def addUpper(name: (String, Long), _upper: ScType, additional: Boolean, variance: Int,
-                        handler: Option[DCHandler.Substitutor] = None): ScUndefinedSubstitutor =
+                        handler: Option[DTHandler.Substitutor] = None): ScUndefinedSubstitutor =
     copy(subs.map(_.addUpper(name, _upper, additional, variance, handler = handler)))
 
-  @uninstrumental("handler")
-  override def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DCHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] = {
+  @uninstrumented("handler")
+  override def getSubstitutorWithBounds(notNonable: Boolean, handler: Option[DTHandler.Substitutor] = None): Option[(ScSubstitutor, Map[Name, ScType], Map[Name, ScType])] = {
     subs.map { sub =>
       val inner = handler.map(_.inner)
       val r = sub.getSubstitutorWithBounds(notNonable, inner)

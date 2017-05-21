@@ -1,4 +1,4 @@
-package org.jetbrains.plugins.scala.actions
+package org.jetbrains.plugins.scala.actions.debug_types
 
 import java.util
 
@@ -6,14 +6,13 @@ import com.intellij.ide.projectView.PresentationData
 import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
-import org.jetbrains.plugins.scala.actions
-import org.jetbrains.plugins.scala.actions.AsSpecificAsCondition._
-import org.jetbrains.plugins.scala.actions.DCTreeStructureConformance.{RelationNode, RelationValue}
-import org.jetbrains.plugins.scala.actions.DCTreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue}
+import AsSpecificAsCondition._
+import DCTreeStructureConformance.{RelationNode, RelationValue}
+import TreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue}
 
 
-object DCTreeStructureCompatibility {
-  case class CompatibilityValue(arguments: Seq[DCHandler.Compatibility#Arg], ret: Option[DCHandler.Resolver#Ret])
+object TreeStructureCompatibility {
+  case class CompatibilityValue(arguments: Seq[DTHandler.Compatibility#Arg], ret: Option[DTHandler.Resolver#Ret])
   case class MostSpecificValue(asSpecificAsCondition: AsSpecificAsCondition)
 
   class CompatibilityNode(value: CompatibilityValue)(implicit project: Project) extends AbstractTreeNode[CompatibilityValue](project, value) {

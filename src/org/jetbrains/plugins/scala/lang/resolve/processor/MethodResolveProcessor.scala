@@ -4,7 +4,7 @@ package resolve
 package processor
 
 import com.intellij.psi._
-import org.jetbrains.plugins.scala.actions.DCHandler
+import org.jetbrains.plugins.scala.actions.debug_types.DTHandler
 import org.jetbrains.plugins.scala.caches.CachesUtil._
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.api.InferUtil
@@ -24,13 +24,13 @@ import org.jetbrains.plugins.scala.lang.psi.types.api._
 import org.jetbrains.plugins.scala.lang.psi.types.api.designator.ScProjectionType
 import org.jetbrains.plugins.scala.lang.psi.types.result.{Success, TypingContext}
 import org.jetbrains.plugins.scala.lang.psi.{ScalaPsiElement, ScalaPsiUtil}
-import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumented
 
 import scala.collection.Set
 import scala.collection.mutable.ArrayBuffer
 
 //todo: remove all argumentClauses, we need just one of them
-@uninstrumental("handler") //
+@uninstrumented("handler") //
 class MethodResolveProcessor(override val ref: PsiElement,
                              val refName: String,
                              var argumentClauses: List[Seq[Expression]],
@@ -45,7 +45,7 @@ class MethodResolveProcessor(override val ref: PsiElement,
                              var noImplicitsForArgs: Boolean = false,
                              val selfConstructorResolve: Boolean = false,
                              val isDynamic: Boolean = false,
-                             handler: Option[DCHandler.Resolver] = None)
+                             handler: Option[DTHandler.Resolver] = None)
                             (implicit override val typeSystem: TypeSystem)
   extends ResolveProcessor(kinds, ref, refName) {
 
@@ -180,7 +180,7 @@ class MethodResolveProcessor(override val ref: PsiElement,
 }
 
 object MethodResolveProcessor {
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   private def problemsFor(c: ScalaResolveResult,
                           checkWithImplicits: Boolean,
                           ref: PsiElement,
@@ -191,7 +191,7 @@ object MethodResolveProcessor {
                           expectedOption: () => Option[ScType],
                           isUnderscore: Boolean,
                           isShapeResolve: Boolean,
-                          handler: Option[DCHandler.Resolver])(implicit typeSystem: TypeSystem): ConformanceExtResult = {
+                          handler: Option[DTHandler.Resolver])(implicit typeSystem: TypeSystem): ConformanceExtResult = {
     val problems = new ArrayBuffer[ApplicabilityProblem]()
 
     val realResolveResult = c.innerResolveResult match {
@@ -545,9 +545,9 @@ object MethodResolveProcessor {
     }
   }
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   def candidates(proc: MethodResolveProcessor, _input: Set[ScalaResolveResult],
-                 handler: Option[DCHandler.Resolver] = None): Set[ScalaResolveResult] = {
+                 handler: Option[DTHandler.Resolver] = None): Set[ScalaResolveResult] = {
     import proc._
 
     //We want to leave only fields and properties from inherited classes, this is important, because

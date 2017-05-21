@@ -6,7 +6,7 @@ package processor
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi._
 import com.intellij.psi.util.PsiTreeUtil
-import org.jetbrains.plugins.scala.actions.{AsSpecificAsCondition, DCHandler}
+import org.jetbrains.plugins.scala.actions.debug_types.{AsSpecificAsCondition, DTHandler}
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.ScalaPsiUtil
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
@@ -23,7 +23,7 @@ import org.jetbrains.plugins.scala.lang.psi.types.api.designator.ScDesignatorTyp
 import org.jetbrains.plugins.scala.lang.psi.types.api.{Any, Nothing, TypeSystem, _}
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.{Parameter, ScMethodType, ScTypePolymorphicType}
 import org.jetbrains.plugins.scala.lang.psi.types.result.TypingContext
-import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumented
 
 import scala.collection.Set
 import scala.collection.mutable.ArrayBuffer
@@ -32,8 +32,8 @@ import scala.collection.mutable.ArrayBuffer
   * User: Alexander Podkhalyuzin
   * Date: 26.04.2010
   */
-@uninstrumental("handler")
-case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHandler.Resolver] = None)
+@uninstrumented("handler")
+case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DTHandler.Resolver] = None)
                            (implicit typeSystem: TypeSystem) {
   def mostSpecificForResolveResult(applicable: Set[ScalaResolveResult],
                                    hasTypeParametersCall: Boolean = false,
@@ -163,7 +163,7 @@ case class MostSpecificUtil(elem: PsiElement, length: Int, handler: Option[DCHan
           }
         }
 
-        var conf = handler.flatMap(_ => Option.empty[Either[DCHandler.Args, DCHandler.Conditions]])
+        var conf = handler.flatMap(_ => Option.empty[Either[DTHandler.Args, DTHandler.Conditions]])
         val conformance = (calcParams(t1, existential = true), calcParams(t2, existential = false)) match {
           case (Left(p1), Left(p2)) =>
             var (params1, params2) = (p1, p2)

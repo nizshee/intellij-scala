@@ -6,10 +6,11 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Computable
 import com.intellij.psi.PsiClass
 import com.intellij.util.containers.ContainerUtil
-import org.jetbrains.plugins.scala.actions.{CCondition, DCHandler, DebugConformanceAction}
+import org.jetbrains.plugins.scala.actions.debug_types.{CCondition, DTHandler}
+import org.jetbrains.plugins.scala.actions.DebugTypesAction
 import org.jetbrains.plugins.scala.caches.RecursionManager
 import org.jetbrains.plugins.scala.lang.psi.types._
-import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumented
 
 
 
@@ -29,11 +30,11 @@ trait Conformance extends TypeSystemOwner {
     * Checks, whether the following assignment is correct:
     * val x: l = (y: r)
     */
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   final def conformsInner(left: ScType, right: ScType,
                           visited: Set[PsiClass] = Set.empty,
                           substitutor: ScUndefinedSubstitutor = ScUndefinedSubstitutor(),
-                          checkWeak: Boolean = false, handler: Option[DCHandler.Conformance] = None): Result = {
+                          checkWeak: Boolean = false, handler: Option[DTHandler.Conformance] = None): Result = {
     ProgressManager.checkCanceled()
 
     if (left.equiv(Any) || right.equiv(Nothing)) {
@@ -65,8 +66,8 @@ trait Conformance extends TypeSystemOwner {
 
   final def clearCache(): Unit = cache.clear()
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   protected def computable(left: ScType, right: ScType,
                            visited: Set[PsiClass],
-                           checkWeak: Boolean, handler: Option[DCHandler.Conformance]): Computable[(Boolean, ScUndefinedSubstitutor)]
+                           checkWeak: Boolean, handler: Option[DTHandler.Conformance]): Computable[(Boolean, ScUndefinedSubstitutor)]
 }

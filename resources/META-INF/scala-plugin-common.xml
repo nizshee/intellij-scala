@@ -1441,7 +1441,7 @@
             <keyboard-shortcut keymap="Mac OS X 10.5+" first-keystroke="meta shift Q" remove="true"/>
             <add-to-group group-id="GoToCodeGroup" anchor="last"/>
         </action>
-        <action id="Scala.DebugConformance" class="org.jetbrains.plugins.scala.actions.DebugConformanceAction"
+        <action id="Scala.DebugConformance" class="org.jetbrains.plugins.scala.actions.DebugTypesAction"
                 text="Debug Conformance" description="Debug conformance method">
                 <keyboard-shortcut keymap="$default" first-keystroke="control shift Y"/>
         </action>

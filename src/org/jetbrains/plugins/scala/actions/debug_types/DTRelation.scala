@@ -1,10 +1,10 @@
-package org.jetbrains.plugins.scala.actions
+package org.jetbrains.plugins.scala.actions.debug_types
 
 import com.intellij.psi.PsiNamedElement
-import org.jetbrains.plugins.scala.actions.DCHandler.Substitutor
-import org.jetbrains.plugins.scala.lang.psi.types.api.{ParameterizedType, UndefinedType}
+import org.jetbrains.plugins.scala.actions.debug_types.DTHandler.Substitutor
+import org.jetbrains.plugins.scala.lang.psi.types.api.ParameterizedType
 import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.ScMethodType
-import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScCompoundType, ScExistentialArgument, ScExistentialType, ScType, Signature, TypeAliasSignature}
+import org.jetbrains.plugins.scala.lang.psi.types.{ScAbstractType, ScCompoundType, ScExistentialType, ScType, Signature, TypeAliasSignature}
 
 
 sealed trait CCondition {
@@ -152,7 +152,7 @@ sealed trait AsSpecificAsCondition {
 }
 
 object AsSpecificAsCondition {
-  case class Method(left: ScType, right: ScType, args: DCHandler.Args, restrictions: Seq[Seq[Substitutor#Restriction]]) extends AsSpecificAsCondition {
+  case class Method(left: ScType, right: ScType, args: DTHandler.Args, restrictions: Seq[Seq[Substitutor#Restriction]]) extends AsSpecificAsCondition {
     override def satisfy: Boolean = args.forall(_.satisfy)
   }
 

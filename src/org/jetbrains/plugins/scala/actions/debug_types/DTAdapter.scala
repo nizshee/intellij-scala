@@ -1,12 +1,11 @@
-package org.jetbrains.plugins.scala.actions
+package org.jetbrains.plugins.scala.actions.debug_types
 
-import org.jetbrains.plugins.scala.actions.CCondition._
-import org.jetbrains.plugins.scala.actions.Relation.{Conformance, Equivalence}
+import CCondition._
 import org.jetbrains.plugins.scala.lang.psi.types.ScalaTypeSystem
 import org.jetbrains.plugins.scala.lang.psi.types.api.TypeSystem
 
 
-object DebugConformanceAdapter {
+object DTAdapter {
 
   implicit val typeSystem: TypeSystem = ScalaTypeSystem
 

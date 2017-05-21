@@ -5,7 +5,7 @@ package resolve
 import com.intellij.openapi.progress.ProgressManager
 import com.intellij.psi._
 import com.intellij.psi.util.PsiTreeUtil
-import org.jetbrains.plugins.scala.actions.DCHandler
+import org.jetbrains.plugins.scala.actions.debug_types.DTHandler
 import org.jetbrains.plugins.scala.caches.CachesUtil
 import org.jetbrains.plugins.scala.extensions.{PsiMethodExt, PsiNamedElementExt}
 import org.jetbrains.plugins.scala.lang.psi.ScalaPsiUtil
@@ -32,7 +32,7 @@ import org.jetbrains.plugins.scala.lang.psi.types.{ScSubstitutor, ScType, ScalaT
 import org.jetbrains.plugins.scala.lang.refactoring.util.ScalaNamesUtil
 import org.jetbrains.plugins.scala.lang.resolve.processor.DynamicResolveProcessor._
 import org.jetbrains.plugins.scala.lang.resolve.processor._
-import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumented
 
 import scala.annotation.tailrec
 import scala.collection.Set
@@ -101,8 +101,8 @@ object ReferenceExpressionResolver {
     }
   }
 
-  @uninstrumental("handler")
-  def resolve(reference: ScReferenceExpression, shapesOnly: Boolean, incomplete: Boolean, handler: Option[DCHandler.Resolver] = None): Array[ResolveResult] = {
+  @uninstrumented("handler")
+  def resolve(reference: ScReferenceExpression, shapesOnly: Boolean, incomplete: Boolean, handler: Option[DTHandler.Resolver] = None): Array[ResolveResult] = {
     val name = if (reference.isUnaryOperator) "unary_" + reference.refName else reference.refName
     val info = getContextInfo(reference, reference)
 

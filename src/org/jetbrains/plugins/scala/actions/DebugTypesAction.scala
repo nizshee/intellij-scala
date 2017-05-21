@@ -18,6 +18,7 @@ import com.intellij.psi.util.PsiUtilBase
 import com.intellij.psi.{PsiElement, PsiNamedElement, PsiWhiteSpace}
 import com.intellij.ui.{ClickListener, ScrollPaneFactory}
 import com.intellij.ui.treeStructure.Tree
+import org.jetbrains.plugins.scala.actions.debug_types._
 import org.jetbrains.plugins.scala.lang.psi.api.ScalaFile
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScReferenceElement
 import org.jetbrains.plugins.scala.lang.psi.api.expr.{ScExpression, ScMethodCall, ScReferenceExpression}
@@ -33,7 +34,7 @@ import org.jetbrains.plugins.scala.lang.resolve.{ReferenceExpressionResolver, Sc
 /**
   * Created by user on 3/20/17.
   */
-class DebugConformanceAction extends AnAction("Debug conformance action") {
+class DebugTypesAction extends AnAction("Debug conformance action") {
 
   private def getSelectedNode(jTree: JTree): AbstractTreeNode[_] = {
     val path: TreePath = jTree.getSelectionPath
@@ -180,39 +181,39 @@ class DebugConformanceAction extends AnAction("Debug conformance action") {
 
   private def processReferenceExpression(reference: ScReferenceExpression)(implicit editor: Editor) = {
     implicit val project: Project = editor.getProject
-    val handler = new DCHandler.Resolver("", true)
+    val handler = new DTHandler.Resolver("", true)
     // TODO? uncomment
-//    val r = ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
-//    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2, handler.ret))
-//    println(values)
-//    showPopup(new DCTreeStructureResolver(values))
+    val r = ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
+    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2, handler.ret))
+    println(values)
+    showPopup(new DCTreeStructureResolver(values))
   }
 
 
   private def processExpression(e: ScExpression)(implicit editor: Editor): Unit = {
     implicit val typeSystem: TypeSystem = e.typeSystem
     implicit val project: Project = editor.getProject
-    val handler = new DCHandler.Conformance("", true)
+    val handler = new DTHandler.Conformance("", true)
     // TODO? uncomment
-//    val leftOption = e.expectedType()
-//    val rightTypeResult = e.getNonValueType().map(_.inferValueType)
-//    leftOption match {
-//      case Some(left) => // TODO get fresh type variable if expected not found
-//        rightTypeResult match {
-//          case Success(right, _) =>
-//            handler.log("Action fired on:")
-//            handler.logtn(left, right)
-//            val inner = handler.inner
-//            val r = Conformance.conformsInner$I(left, right, handler = Some(inner))
-//            println(r)
-//            val conformance = Relation.Conformance(left, right, inner.conditions)
-//            val values = Seq(DCTreeStructureConformance.Value(if (true) DebugConformanceAdapter(conformance) else conformance))
-//            showPopup(new DCTreeStructureConformance(values))
-//            println(inner.conditions)
-//          case Failure(cause, _) => showHint(s"Can't derive type: $cause")
-//        }
-//      case None => showHint("No expected type found.")
-//    }
+    val leftOption = e.expectedType()
+    val rightTypeResult = e.getNonValueType().map(_.inferValueType)
+    leftOption match {
+      case Some(left) => // TODO get fresh type variable if expected not found
+        rightTypeResult match {
+          case Success(right, _) =>
+            handler.log("Action fired on:")
+            handler.logtn(left, right)
+            val inner = handler.inner
+            val r = Conformance.conformsInner$I(left, right, handler = Some(inner))
+            println(r)
+            val conformance = Relation.Conformance(left, right, inner.conditions)
+            val values = Seq(DCTreeStructureConformance.Value(if (true) DTAdapter(conformance) else conformance))
+            showPopup(new DCTreeStructureConformance(values))
+            println(inner.conditions)
+          case Failure(cause, _) => showHint(s"Can't derive type: $cause")
+        }
+      case None => showHint("No expected type found.")
+    }
 
   }
 }

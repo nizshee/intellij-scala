@@ -1,17 +1,17 @@
-package org.jetbrains.plugins.scala.actions
+package org.jetbrains.plugins.scala.actions.debug_types
 
 import java.util
 
-import com.intellij.ide.projectView.{PresentationData, ViewSettings}
 import com.intellij.ide.projectView.impl.nodes.AbstractPsiBasedNode
+import com.intellij.ide.projectView.{PresentationData, ViewSettings}
 import com.intellij.ide.util.treeView.{AbstractTreeNode, AbstractTreeStructure, NodeDescriptor}
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
 import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.{PsiElement, PsiField, PsiMethod, PsiNamedElement}
-import org.jetbrains.plugins.scala.actions.DCTreeStructureCompatibility.{CompatibilityNode, CompatibilityValue, MostSpecificNode, MostSpecificValue}
-import org.jetbrains.plugins.scala.actions.DCTreeStructureConformance._
-import org.jetbrains.plugins.scala.actions.DCTreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue, TypeVariableNode}
+import TreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue, TypeVariableNode}
+import org.jetbrains.plugins.scala.actions.debug_types.TreeStructureCompatibility.{CompatibilityNode, CompatibilityValue, MostSpecificNode, MostSpecificValue}
+import org.jetbrains.plugins.scala.actions.debug_types.DCTreeStructureConformance._
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
 import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.ScReferencePattern
 import org.jetbrains.plugins.scala.lang.psi.api.statements.{ScFun, ScFunction, ScPatternDefinition, ScVariableDefinition}
@@ -123,10 +123,10 @@ object DCTreeStructureResolver {
     case _ => "unknown"
   }
 
-  case class Value(el: PsiNamedElement, candidate: DCHandler.Resolver#Candidate, ret: Option[DCHandler.Resolver#Ret], prefix: String = "")
-  case class CandidateValue(el: PsiNamedElement, candidate: DCHandler.Resolver#Candidate, ret: Option[DCHandler.Resolver#Ret])
-  case class WeightValue(el: PsiNamedElement, weight: DCHandler.Resolver#Weight)
-  case class WeightsValue(weights: Map[PsiNamedElement, DCHandler.Resolver#Weight])
+  case class Value(el: PsiNamedElement, candidate: DTHandler.Resolver#Candidate, ret: Option[DTHandler.Resolver#Ret], prefix: String = "")
+  case class CandidateValue(el: PsiNamedElement, candidate: DTHandler.Resolver#Candidate, ret: Option[DTHandler.Resolver#Ret])
+  case class WeightValue(el: PsiNamedElement, weight: DTHandler.Resolver#Weight)
+  case class WeightsValue(weights: Map[PsiNamedElement, DTHandler.Resolver#Weight])
 
   class CandidateNode(value: CandidateValue)(implicit project: Project) extends AbstractPsiBasedNode[CandidateValue](project, value, ViewSettings.DEFAULT) {
     private val greaterWeight = value.candidate.weights.values.forall(_.wins)

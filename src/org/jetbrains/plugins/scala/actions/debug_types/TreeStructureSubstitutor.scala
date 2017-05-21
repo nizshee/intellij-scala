@@ -1,4 +1,4 @@
-package org.jetbrains.plugins.scala.actions
+package org.jetbrains.plugins.scala.actions.debug_types
 
 import java.util
 
@@ -7,16 +7,15 @@ import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
 import org.jetbrains.plugins.scala.lang.psi.types.ScType
-import org.jetbrains.plugins.scala.lang.psi.types.api.UndefinedType
 
 import scala.util.{Left, Right}
 
 /**
   * Created by user on 4/12/17.
   */
-object DCTreeStructureSubstitutor {
-  case class SubstitutorValue(restrictions: Seq[Seq[DCHandler.Substitutor#Restriction]])
-  case class TypeVariableValue(restriction: DCHandler.Substitutor#Restriction)
+object TreeStructureSubstitutor {
+  case class SubstitutorValue(restrictions: Seq[Seq[DTHandler.Substitutor#Restriction]])
+  case class TypeVariableValue(restriction: DTHandler.Substitutor#Restriction)
   case class RestrictionValue(v: Either[ScType, ScType])
 
   class SubstitutorNode(value: SubstitutorValue)(implicit project: Project) extends AbstractTreeNode[SubstitutorValue](project, value) {

@@ -7,14 +7,14 @@ import scala.reflect.macros.whitebox.Context
 
 
 @compileTimeOnly("generate two methods / classes")
-class uninstrumental(parameterName: String, debug: Boolean = false) extends StaticAnnotation {
-  def macroTransform(annottees: Any*): Any = macro generateInstrumentationMacro.impl
+class uninstrumented(parameterName: String, debug: Boolean = false) extends StaticAnnotation {
+  def macroTransform(annottees: Any*): Any = macro uninstrumentedMacro.impl
 }
 
 /** bugs:
   *   - multiple constructors
   */
-object generateInstrumentationMacro {
+object uninstrumentedMacro {
 
   /**
     * Generates from annotated method / class `f` two methods `f` and `f$I`.
@@ -33,8 +33,8 @@ object generateInstrumentationMacro {
     import c.universe._
 
     val (parameter, debug) = c.prefix match {
-      case Expr(q"new uninstrumental($s)") => (c.eval[String](c.Expr(s)), false)
-      case Expr(q"new uninstrumental($s, debug = $b)") => (c.eval[String](c.Expr(s)), c.eval[Boolean](c.Expr(b)))
+      case Expr(q"new uninstrumented($s)") => (c.eval[String](c.Expr(s)), false)
+      case Expr(q"new uninstrumented($s, debug = $b)") => (c.eval[String](c.Expr(s)), c.eval[Boolean](c.Expr(b)))
       case _ => c.abort(c.enclosingPosition, "No parameter name was given!")
     }
 
@@ -413,8 +413,8 @@ object generateInstrumentationMacro {
     }
 
     if (debug) {
-//      println(annottee)
-//      expandees.foreach(println)
+      println(annottee)
+      expandees.foreach(println)
     }
 
     c.Expr[Any](Block(expandees, Literal(Constant(()))))

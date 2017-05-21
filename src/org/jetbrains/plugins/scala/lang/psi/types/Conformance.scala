@@ -7,6 +7,7 @@ import com.intellij.openapi.progress.ProgressManager
 import com.intellij.openapi.util.Computable
 import com.intellij.psi._
 import org.jetbrains.plugins.scala.actions._
+import org.jetbrains.plugins.scala.actions.debug_types.{CCondition, DTHandler, ECondition, Relation}
 import org.jetbrains.plugins.scala.decompiler.DecompilerUtil
 import org.jetbrains.plugins.scala.extensions._
 import org.jetbrains.plugins.scala.lang.psi.ScalaPsiUtil._
@@ -24,7 +25,7 @@ import org.jetbrains.plugins.scala.lang.psi.types.nonvalue.{ScMethodType, ScType
 import org.jetbrains.plugins.scala.lang.psi.types.result.{Success, Typeable, TypingContext}
 import org.jetbrains.plugins.scala.lang.refactoring.util.ScTypeUtil.AliasType
 import org.jetbrains.plugins.scala.lang.resolve.processor.{CompoundTypeCheckSignatureProcessor, CompoundTypeCheckTypeAliasProcessor}
-import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumented
 import org.jetbrains.plugins.scala.util.ScEquivalenceUtil._
 
 import _root_.scala.collection.immutable.HashSet
@@ -35,8 +36,8 @@ import scala.collection.{Seq, immutable, mutable}
 object Conformance extends api.Conformance {
   override implicit lazy val typeSystem = ScalaTypeSystem
 
-  @uninstrumental("handler")
-  override protected def computable(left: ScType, right: ScType, visited: Set[PsiClass], checkWeak: Boolean, handler: Option[DCHandler.Conformance]) =
+  @uninstrumented("handler")
+  override protected def computable(left: ScType, right: ScType, visited: Set[PsiClass], checkWeak: Boolean, handler: Option[DTHandler.Conformance]) =
     new Computable[(Boolean, ScUndefinedSubstitutor)] {
       override def compute(): (Boolean, ScUndefinedSubstitutor) = {
         val substitutor = ScUndefinedSubstitutor()
@@ -107,10 +108,10 @@ object Conformance extends api.Conformance {
       }
     }
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   private def checkParameterizedType(parametersIterator: Iterator[PsiTypeParameter], args1: scala.Seq[ScType],
                                      args2: scala.Seq[ScType], _undefinedSubst: ScUndefinedSubstitutor,
-                                     visited: Set[PsiClass], checkWeak: Boolean, handler: Option[DCHandler.Conformance]): (Boolean, ScUndefinedSubstitutor) = {
+                                     visited: Set[PsiClass], checkWeak: Boolean, handler: Option[DTHandler.Conformance]): (Boolean, ScUndefinedSubstitutor) = {
     var undefinedSubst = _undefinedSubst
 
     handler.foreach(_.log("checkParameterizedType"))
@@ -252,11 +253,11 @@ object Conformance extends api.Conformance {
     (true, undefinedSubst)
   }
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   private class LeftConformanceVisitor(l: ScType, r: ScType, visited: Set[PsiClass],
                                        subst: ScUndefinedSubstitutor,
                                        checkWeak: Boolean = false,
-                                       handler: Option[DCHandler.Conformance] = None) extends ScalaTypeVisitor {
+                                       handler: Option[DTHandler.Conformance] = None) extends ScalaTypeVisitor {
     private def addBounds(parameterType: TypeParameterType, `type`: ScType) = {
       val name = parameterType.nameAndId
       val sHandler = handler.map(_.substitutor)
@@ -2188,9 +2189,9 @@ object Conformance extends api.Conformance {
     }
   }
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   def addParam(parameterType: TypeParameterType, bound: ScType, undefinedSubst: ScUndefinedSubstitutor,
-               defArgs: Seq[ScType], undefArgs: Seq[ScType], handler: Option[DCHandler.Conformance] = None): (Boolean, ScUndefinedSubstitutor) = {
+               defArgs: Seq[ScType], undefArgs: Seq[ScType], handler: Option[DTHandler.Conformance] = None): (Boolean, ScUndefinedSubstitutor) = {
     val inner = handler.map(_.inner)
     val r = addArgedBound(parameterType, bound, undefinedSubst, defArgs, undefArgs, variance = 0, addUpper = true, addLower = true, handler = inner)
     handler.foreach { h =>
@@ -2206,10 +2207,10 @@ object Conformance extends api.Conformance {
     r
   }
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   def addArgedBound(parameterType: TypeParameterType, bound: ScType, undefinedSubst: ScUndefinedSubstitutor,
                     defArgs: Seq[ScType], undefArgs: Seq[ScType], variance: Int = 1,
-                    addUpper: Boolean = false, addLower: Boolean = false, handler: Option[DCHandler.Conformance]): (Boolean, ScUndefinedSubstitutor) = {
+                    addUpper: Boolean = false, addLower: Boolean = false, handler: Option[DTHandler.Conformance]): (Boolean, ScUndefinedSubstitutor) = {
     handler.foreach(_.logn("addArgedBound - ok"))
     if (!addUpper && !addLower) return (false, undefinedSubst)
     var res = undefinedSubst

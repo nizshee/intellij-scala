@@ -2,9 +2,10 @@ package org.jetbrains.plugins.dotty.lang.psi.types
 
 import com.intellij.openapi.util.Computable
 import com.intellij.psi.PsiClass
-import org.jetbrains.plugins.scala.actions.{DCHandler, DebugConformanceAction}
+import org.jetbrains.plugins.scala.actions.DebugTypesAction
+import org.jetbrains.plugins.scala.actions.debug_types.DTHandler
 import org.jetbrains.plugins.scala.lang.psi.types._
-import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
+import org.jetbrains.plugins.scala.macroAnnotations.uninstrumented
 
 /**
   * @author adkozlov
@@ -12,9 +13,9 @@ import org.jetbrains.plugins.scala.macroAnnotations.uninstrumental
 object Conformance extends api.Conformance {
   override implicit lazy val typeSystem = DottyTypeSystem
 
-  @uninstrumental("handler")
+  @uninstrumented("handler")
   override protected def computable(left: ScType, right: ScType, visited: Set[PsiClass], checkWeak: Boolean,
-                                    handler: Option[DCHandler.Conformance]) = new Computable[(Boolean, ScUndefinedSubstitutor)] {
+                                    handler: Option[DTHandler.Conformance]) = new Computable[(Boolean, ScUndefinedSubstitutor)] {
     override def compute(): (Boolean, ScUndefinedSubstitutor) = (false, ScUndefinedSubstitutor())
   }
 

@@ -1,14 +1,15 @@
-package org.jetbrains.plugins.scala.actions
+package org.jetbrains.plugins.scala.actions.debug_types
 
 import com.intellij.psi.PsiNamedElement
-import org.jetbrains.plugins.scala.lang.psi.types.api.{Any, Nothing, UndefinedType}
+import org.jetbrains.plugins.scala.actions._
+import org.jetbrains.plugins.scala.lang.psi.types.api.{Any, Nothing}
 import org.jetbrains.plugins.scala.lang.psi.types.{ScCompoundType, ScType, ScUndefinedSubstitutor, ScalaTypeSystem, Signature, TypeAliasSignature}
 import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
 
 /**
   * Created by user on 4/10/17.
   */
-protected class DCHandler(delimeter: String, debug: Boolean) {
+protected class DTHandler(delimeter: String, debug: Boolean) {
   private var _corrupted: Boolean = false
 
   def corrupt(): Unit = _corrupted = true
@@ -24,9 +25,9 @@ protected class DCHandler(delimeter: String, debug: Boolean) {
   }
 }
 
-object DCHandler {
+object DTHandler {
 
-  class Conformance(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug) {
+  class Conformance(delimeter: String, debug: Boolean) extends DTHandler(delimeter, debug) {
 
     private var _compound: Option[CCondition.CompoundLeft] = None
     private var _conditions: Seq[CCondition] = Seq()
@@ -100,7 +101,7 @@ object DCHandler {
   }
 
 
-  class Compatibility(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug) {
+  class Compatibility(delimeter: String, debug: Boolean) extends DTHandler(delimeter, debug) {
     case class Arg(name: String,
                    expectedType: ScType,
                    actualType: ScType,
@@ -115,7 +116,7 @@ object DCHandler {
       arg
     }
 
-    def handler: DCHandler.Conformance = new DCHandler.Conformance(delimeter + "r|", debug)
+    def handler: DTHandler.Conformance = new DTHandler.Conformance(delimeter + "r|", debug)
 
     def args: Seq[Arg] = _args
 
@@ -124,7 +125,7 @@ object DCHandler {
     }
   }
 
-  class Substitutor(delimeter: String, debug: Boolean) extends DCHandler(delimeter, debug) {
+  class Substitutor(delimeter: String, debug: Boolean) extends DTHandler(delimeter, debug) {
     case class Restriction(name: (String, Long),
                            `type`: Option[ScType],
                            uppers: Set[ScType],
@@ -181,7 +182,7 @@ object DCHandler {
       if (_follows.nonEmpty) _follows else Seq(_restrictions)
   }
 
-  class Resolver(delimter: String, debug: Boolean) extends DCHandler(delimter, debug) {
+  class Resolver(delimter: String, debug: Boolean) extends DTHandler(delimter, debug) {
 
     case class Weight(opposite: Int, asSpecificAs: Option[AsSpecificAsCondition], derived: Option[Derived.type]) {
       def wins: Boolean = opposite < v
@@ -237,7 +238,7 @@ object DCHandler {
       }
     }
 
-    def +(args: Seq[DCHandler.Compatibility#Arg]): Unit = {
+    def +(args: Seq[DTHandler.Compatibility#Arg]): Unit = {
       _last.flatMap(el => _candidates.get(el).map(el -> _)) match {
         case Some((el, candidate)) =>
           _candidates += el -> candidate.copy(args = args)
@@ -302,6 +303,6 @@ object DCHandler {
       }.toList
   }
 
-  type Args = Seq[DCHandler.Compatibility#Arg]
+  type Args = Seq[DTHandler.Compatibility#Arg]
   type Conditions = Seq[CCondition]
 }
