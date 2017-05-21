@@ -191,7 +191,9 @@ object DTHandler {
     case class Candidate(rr: Option[ScalaResolveResult],
                          weights: Map[PsiNamedElement, Weight],
                          args: Seq[Compatibility#Arg],
-                         restrictions: Seq[Seq[Substitutor#Restriction]])
+                         restrictions: Seq[Seq[Substitutor#Restriction]],
+                         defaultInterfere: Boolean = false,
+                         wrongNameArguments: Set[String] = Set.empty)
     case class Ret(expextedType: ScType,
                    actualType: ScType,
                    conditions: Seq[CCondition],
@@ -230,6 +232,22 @@ object DTHandler {
       }
     }
 
+    def defaultInterfere(element: PsiNamedElement): Unit = {
+      _candidates.get(element).map(element -> _) match {
+        case Some((el, candidate)) =>
+          _candidates += el -> candidate.copy(defaultInterfere = true)
+        case _ =>
+      }
+    }
+
+    def wrongArgument(element: PsiNamedElement, paramter: String): Unit = {
+      _candidates.get(element).map(element -> _) match {
+        case Some((el, candidate)) =>
+          _candidates += el -> candidate.copy(wrongNameArguments = candidate.wrongNameArguments + paramter)
+        case _ =>
+      }
+    }
+
     def addRestrictions(restrictions: Seq[Seq[Substitutor#Restriction]]): Unit = {
       _last.flatMap(el => _candidates.get(el).map(el -> _)) match {
         case Some((el, candidate)) =>
@@ -254,14 +272,6 @@ object DTHandler {
       _candidates += _left -> candidate.copy(
         weights = candidate.weights.updated(_right, weight.copy(asSpecificAs = Some(asSpecificAs)))
       )
-
-//      val w = if (asSpecificAs.satisfy) 1 else 0
-//      log("!!! " + left.getText + " " + w)
-//      val rCandidate = _candidates.getOrElse(_right, Candidate(None, Map.empty, Seq.empty, Seq.empty))
-//      val rWeight = rCandidate.weights.getOrElse(_left, Weight(0, None, None))
-//      _candidates += _right -> rCandidate.copy(
-//        weights = rCandidate.weights.updated(_left, rWeight.copy(opposite = rWeight.opposite + w))
-//      )
     }
 
     def addDerived(left: PsiNamedElement, right: PsiNamedElement): Unit = {

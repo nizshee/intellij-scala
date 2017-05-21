@@ -21,8 +21,8 @@ import org.jetbrains.plugins.scala.lang.psi.types._
 /**
   * Created by user on 4/10/17.
   */
-class DCTreeStructureResolver(values: Seq[DCTreeStructureResolver.Value])(implicit project: Project) extends AbstractTreeStructure {
-  import DCTreeStructureResolver._
+class TreeStructureResolver(values: Seq[TreeStructureResolver.Value])(implicit project: Project) extends AbstractTreeStructure {
+  import TreeStructureResolver._
 
   private class RootNode extends AbstractTreeNode[Any](project, ()) {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
@@ -89,7 +89,7 @@ class DCTreeStructureResolver(values: Seq[DCTreeStructureResolver.Value])(implic
   override def commit(): Unit = {}
 }
 
-object DCTreeStructureResolver {
+object TreeStructureResolver {
 //  @inline private def el2String(el: PsiNamedElement): String = MostSpecificUtil(el, 0)(ScalaTypeSystem).getType(el, implicitCase = false).toString
 //  @inline private def el2String(el: PsiNamedElement): String = el.getNode.getText
 
@@ -160,6 +160,10 @@ object DCTreeStructureResolver {
           list.add(new CompatibilityNode(CompatibilityValue(value.candidate.args, value.ret)))
         if (value.candidate.restrictions.exists(_.nonEmpty))
           list.add(new SubstitutorNode(SubstitutorValue(value.candidate.restrictions)))
+        if (value.candidate.defaultInterfere)
+          list.add(new TextNode(TextValue("uses default argument", satisfy = false)))
+        if (value.candidate.wrongNameArguments.nonEmpty)
+          list.add(new TextNode(TextValue(s"wrong named arguments: ${value.candidate.wrongNameArguments.mkString(", ")}", satisfy = false)))
         if (value.candidate.weights.nonEmpty)
           list.add(new WeightNode(WeightsValue(value.candidate.weights)))
       }
@@ -169,7 +173,8 @@ object DCTreeStructureResolver {
     override def updateImpl(presentationData: PresentationData): Unit = {
       val text = el2String(value.el)
       presentationData.setPresentableText(text)
-      if (!greaterWeight || !conditionsExists || !restictionsHaveSolution || problems.nonEmpty)
+      if (!greaterWeight || !conditionsExists || !restictionsHaveSolution || problems.nonEmpty ||
+        value.candidate.defaultInterfere || value.candidate.wrongNameArguments.nonEmpty)
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
 
@@ -200,6 +205,7 @@ object DCTreeStructureResolver {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
       asSpecificAs.foreach(list.add)
+      value.weight.derived.foreach(_ => list.add(new TextNode(TextValue("derived", satisfy = true))))
       list
     }
 

@@ -498,7 +498,7 @@ object MethodResolveProcessor {
           val inner = handler.map(_.substitutor)
           uSubst.getSubstitutor(notNonable = false, handler = inner) match {
             case Some(su) =>
-              handler.map { h =>
+              handler.foreach { h =>
                 val maybeTypeParameters: Option[Seq[((String, Long), Boolean)]] = element match {
                   case t: ScTypeParametersOwner => Some(t.typeParameters.map(p => p.nameAndId -> p.isContravariant))
                   case p: PsiTypeParameterListOwner => Some(p.getTypeParameters.map(p => p.nameAndId -> false))
@@ -692,6 +692,7 @@ object MethodResolveProcessor {
           r.element match {
             case func: ScFunction if func.hasParameterClause =>
               val paramsNames = func.parameterList.params.map(_.name)
+              handler.foreach(h => if (listOfNames.exists(p => !paramsNames.contains(p))) h.wrongArgument(r.element, listOfNames.get))
               listOfNames.find(str => !paramsNames.contains(str)).forall(_.isEmpty)
             case _ => false
           }
@@ -701,10 +702,14 @@ object MethodResolveProcessor {
 
     //remove default parameters alternatives
     if (filtered.size > 1 && !isShapeResolve) {
-      handler.foreach(_.log("remove default params alternatives - skip")) // TODO?
+      handler.foreach(_.log("remove default params alternatives - ok"))
       filtered = filtered.filter(r => r.innerResolveResult match {
-        case Some(rr) => !rr.defaultParameterUsed
-        case None => !r.defaultParameterUsed
+        case Some(rr) =>
+          handler.foreach(h => if (rr.defaultParameterUsed) h.defaultInterfere(rr.element))
+          !rr.defaultParameterUsed
+        case None =>
+          handler.foreach(h => if (r.defaultParameterUsed) h.defaultInterfere(r.element))
+          !r.defaultParameterUsed
       })
     }
 

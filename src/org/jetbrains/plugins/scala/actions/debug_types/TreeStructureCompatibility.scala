@@ -67,7 +67,7 @@ object TreeStructureCompatibility {
         case Method(left, right, _, _) =>
           s"method $left as specific as $right"
         case Polymorphic(_) =>
-          "todo"
+          "polymorphic" // TODO?
         case Other(_) =>
           s"not polymorphic or method always as specific as polymorphic or method"
         case Explanation(txt, _) => txt

@@ -37,13 +37,13 @@ object CCondition {
     override def satisfy: Boolean = conforms.satisfy
   }
 
-  case class UndefinedLeft(left: ScAbstractType, right: ScType, upper: ScType, uConditions: Seq[CCondition],
-                           lower: ScType, lConfitions: Seq[CCondition]) extends CCondition {
+  case class UndefinedLeft(left: ScAbstractType, right: ScType, uConditions: Seq[CCondition],
+                           lConfitions: Seq[CCondition]) extends CCondition {
     override def satisfy: Boolean = uConditions.exists(_.satisfy)
   }
 
-  case class UndefinedRight(left: ScType, right: ScAbstractType, upper: ScType, uConditions: Seq[CCondition],
-                            lower: ScType, lConfitions: Seq[CCondition]) extends CCondition {
+  case class UndefinedRight(left: ScType, right: ScAbstractType, uConditions: Seq[CCondition],
+                            lConfitions: Seq[CCondition]) extends CCondition {
     override def satisfy: Boolean = lConfitions.exists(_.satisfy)
   }
 

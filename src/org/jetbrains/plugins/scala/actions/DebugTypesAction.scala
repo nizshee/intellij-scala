@@ -181,19 +181,19 @@ class DebugTypesAction extends AnAction("Debug conformance action") {
 
   private def processReferenceExpression(reference: ScReferenceExpression)(implicit editor: Editor) = {
     implicit val project: Project = editor.getProject
-    val handler = new DTHandler.Resolver("", true)
+    val handler = new DTHandler.Resolver("", false)
     // TODO? uncomment
     val r = ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
-    val values = handler.candidates.map(c => DCTreeStructureResolver.Value(c._1, c._2, handler.ret))
+    val values = handler.candidates.map(c => TreeStructureResolver.Value(c._1, c._2, handler.ret))
     println(values)
-    showPopup(new DCTreeStructureResolver(values))
+    showPopup(new TreeStructureResolver(values))
   }
 
 
   private def processExpression(e: ScExpression)(implicit editor: Editor): Unit = {
     implicit val typeSystem: TypeSystem = e.typeSystem
     implicit val project: Project = editor.getProject
-    val handler = new DTHandler.Conformance("", true)
+    val handler = new DTHandler.Conformance("", false)
     // TODO? uncomment
     val leftOption = e.expectedType()
     val rightTypeResult = e.getNonValueType().map(_.inferValueType)

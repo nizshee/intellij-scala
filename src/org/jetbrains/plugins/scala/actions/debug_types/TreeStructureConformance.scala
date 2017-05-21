@@ -11,6 +11,7 @@ import com.intellij.psi.{PsiElement, PsiNamedElement}
 import CCondition._
 import ECondition.{Simple, Special}
 import org.jetbrains.plugins.scala.actions._
+import org.jetbrains.plugins.scala.actions.debug_types.TreeStructureSubstitutor.{RestrictionNode, RestrictionValue, SubstitutorNode, SubstitutorValue}
 
 
 
@@ -161,10 +162,17 @@ object DCTreeStructureConformance {
         case c: CCondition.UndefinedLeft =>
           c.uConditions.foreach(v => list.add(new CConditionNode(CConditionValue(v))))
         case c: BaseType =>
-        case c: ExistentialLeft =>
+        case c: ExistentialLeft => // TODO? too raw
+          list.add(new RelationNode(RelationValue(c.conformance)))
+          list.add(new SubstitutorNode(SubstitutorValue(c.restrictions)))
         case c: FromNothing =>
         case c: FromNull =>
-        case c: Polymorphic =>
+        case c: Polymorphic => // TODO? too raw
+          c.i.foreach(v => list.add(new RelationNode(RelationValue(v))))
+          c.args.foreach { case (v1, v2) =>
+            list.add(new RelationNode(RelationValue(v1)))
+            list.add(new RelationNode(RelationValue(v2)))
+          }
         case c: RestrictionRight =>
         case c: RestrictionLeft =>
         case c: ToAny =>
@@ -196,9 +204,9 @@ object DCTreeStructureConformance {
         case c: CCondition.TypeLower =>
           s"${c.lower} is lower bound for ${c.`type`}"
         case c: CCondition.UndefinedLeft =>
-          s"${c.right} should conform to upper bound of undefined ${c.left} <: ${c.upper}"
+          s"${c.right} should conform to upper bound of undefined ${c.left} <: ${c.left.upper}"
         case c: CCondition.UndefinedRight =>
-          s"lower bound of undefined ${c.lower} <: ${c.right} should conform to ${c.left}"
+          s"lower bound of undefined ${c.right.lower} <: ${c.right} should conform to ${c.left}"
         case c: CCondition.FromNull =>
           s"${c.left} is conforms to AnyRef"
         case c: CCondition.RestrictionLeft =>
