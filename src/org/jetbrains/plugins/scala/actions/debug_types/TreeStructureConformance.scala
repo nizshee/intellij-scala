@@ -10,14 +10,15 @@ import com.intellij.openapi.project.Project
 import com.intellij.psi.{PsiElement, PsiNamedElement}
 import CCondition._
 import ECondition.{Simple, Special}
-import org.jetbrains.plugins.scala.actions._
-import org.jetbrains.plugins.scala.actions.debug_types.TreeStructureSubstitutor.{RestrictionNode, RestrictionValue, SubstitutorNode, SubstitutorValue}
+import org.jetbrains.plugins.scala.actions.debug_types.TreeStructureCompatibility.{CompatibilityNode, MostSpecificNode}
+import org.jetbrains.plugins.scala.actions.debug_types.TreeStructureResolver.{CandidateNode, TextNode, WeightNode, WeightSubNode}
+import org.jetbrains.plugins.scala.actions.debug_types.TreeStructureSubstitutor._
 
 
 
-class DCTreeStructureConformance(values: Seq[DCTreeStructureConformance.Value])(implicit project: Project) extends AbstractTreeStructure {
+class TreeStructureConformance(values: Seq[TreeStructureConformance.Value])(implicit project: Project) extends AbstractTreeStructure {
 
-  import DCTreeStructureConformance._
+  import TreeStructureConformance._
 
   private class RootNode extends AbstractTreeNode[Any](project, ()) {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
@@ -35,12 +36,45 @@ class DCTreeStructureConformance(values: Seq[DCTreeStructureConformance.Value])(
 
   override def getChildElements(o: scala.Any): Array[AnyRef] = o match {
     case _: RootNode => values.map(v => new RelationNode(RelationValue(v.relation))).toArray
+    case n: CandidateNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
+    case n: WeightNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
+    case n: WeightSubNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
+    case n: CompatibilityNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
     case n: RelationNode =>
-      val childrenImpl = n.getChildren
-      childrenImpl.toArray(new Array[AnyRef](childrenImpl.size))
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
+    case n: TextNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
+    case n: ElementNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
+    case n: ActualElementNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
     case n: CConditionNode =>
-      val childrenImpl = n.getChildren
-      childrenImpl.toArray(new Array[AnyRef](childrenImpl.size))
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
+    case n: EConditionNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
+    case n: SubstitutorNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
+    case n: TypeVariableNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
+    case n: MostSpecificNode =>
+      val children = n.getChildren
+      children.toArray(new Array[AnyRef](children.size))
     case _ => Array.empty
   }
 
@@ -52,7 +86,7 @@ class DCTreeStructureConformance(values: Seq[DCTreeStructureConformance.Value])(
 }
 
 
-object DCTreeStructureConformance {
+object TreeStructureConformance {
   case class Value(relation: Relation, prefix: String = "")
 
   case class RelationValue(v: Relation, prefix: String = "")

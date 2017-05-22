@@ -130,14 +130,14 @@ object Conformance extends api.Conformance {
             if (handler.isEmpty) return false
           }
           else {
-            handler.foreach(_ => conditions1 = inner.map(_.conditions))
+            conditions1 = inner.map(_.conditions)
             undefinedSubst = t._2
           }
         } else {
-          handler.foreach(_ => conditions1 = inner.map(_.conditions))
+          conditions1 = inner.map(_.conditions)
           undefinedSubst = t._2
         }
-      } else handler.foreach(_ => conditions1 = Some(Seq(CCondition.ToAny(tp))))
+      } else conditions1 = conditions1.map(_ => Seq(CCondition.ToAny(tp)))
 
       var conditions2 = handler.map(_ => Seq.empty[CCondition])
       if (!lower.equiv(Nothing)) {
@@ -150,14 +150,14 @@ object Conformance extends api.Conformance {
             if (handler.isEmpty) return false
           }
           else {
-            handler.foreach(_ => conditions2 = inner.map(_.conditions))
+            conditions2 = inner.map(_.conditions)
             undefinedSubst = t._2
           }
         } else {
-          handler.foreach(_ => conditions2 = inner.map(_.conditions))
+          conditions2 = inner.map(_.conditions)
           undefinedSubst = t._2
         }
-      } else handler.foreach(_ => conditions2 = Some(Seq(CCondition.FromNothing(tp))))
+      } else conditions2 = conditions2.map(_ => Seq(CCondition.FromNothing(tp)))
       handler.foreach(_ + CCondition.Invariant(hName.get, Relation.Equivalence(hAbstract.get, tp, ECondition.Special(
         Some(Relation.Conformance(upper, tp, conditions1.get)), Some(Relation.Conformance(tp, lower, conditions2.get))))))
       true
@@ -316,10 +316,10 @@ object Conformance extends api.Conformance {
         if (!a.lower.equiv(Nothing)) {
           val inner = handler.map(_.inner)
           result = conformsInner(left, a.lower, visited, undefinedSubst, checkWeak, handler = inner)
-          handler.foreach(_ => conditions1 = inner.map(_.conditions))
+          conditions1 = inner.map(_.conditions)
         } else {
           result = (true, undefinedSubst)
-          handler.foreach(_ => conditions1 = Some(Seq(CCondition.FromNothing(a))))
+          conditions1 = conditions1.map(_ => Seq(CCondition.FromNothing(a)))
         }
         if ((result._1 && !a.upper.equiv(Any)) || handler.nonEmpty) {
           val inner = handler.map(_.inner)
@@ -1063,23 +1063,23 @@ object Conformance extends api.Conformance {
               if (!upper.equiv(Any)) {
                 val inner = handler.map(_.inner)
                 val t = conformsInner(upper, right, visited, undefinedSubst, checkWeak, handler = inner)
-                handler.foreach(_ => conditions1 = inner.map(_.conditions))
+                conditions1 = inner.map(_.conditions)
                 if (!t._1 && handler.isEmpty) {
                   result = (false, undefinedSubst)
                   return
                 }
                 undefinedSubst = t._2
-              } else handler.foreach(_ => conditions1 = Some(Seq(CCondition.ToAny(right))))
+              } else conditions1 = conditions1.map(_ => Seq(CCondition.ToAny(right)))
               if (!lower.equiv(Nothing)) {
                 val inner = handler.map(_.inner)
                 val t = conformsInner(right, lower, visited, undefinedSubst, checkWeak, handler = inner)
-                handler.foreach(_ => conditions2 = inner.map(_.conditions))
+                conditions2 = inner.map(_.conditions)
                 if (!t._1 && handler.isEmpty) {
                   result = (false, undefinedSubst)
                   return
                 }
                 undefinedSubst = t._2
-              } else handler.foreach(_ => conditions2 = Some(Seq(CCondition.FromNothing(right))))
+              } else conditions2 = conditions2.map(_ => Seq(CCondition.FromNothing(right)))
               handler.foreach { h =>
                 val a = ScAbstractType(tpt, lower, upper)
                 h + CCondition.Equivalent(
@@ -1099,23 +1099,23 @@ object Conformance extends api.Conformance {
               if (!upper.equiv(Any)) {
                 val inner = handler.map(_.inner)
                 val t = conformsInner(upper, left, visited, undefinedSubst, checkWeak, handler = inner)
-                handler.foreach(_ => conditions1 = inner.map(_.conditions))
+                conditions1 = inner.map(_.conditions)
                 if (!t._1 && handler.isEmpty) {
                   result = (false, undefinedSubst)
                   return
                 }
                 undefinedSubst = t._2
-              } else handler.foreach(_ => conditions1 = Some(Seq(CCondition.ToAny(left))))
+              } else conditions1 = conditions1.map(_ => Seq(CCondition.ToAny(left)))
               if (!lower.equiv(Nothing)) {
                 val inner = handler.map(_.inner)
                 val t = conformsInner(left, lower, visited, undefinedSubst, checkWeak, handler = inner)
-                handler.foreach(_ => conditions2 = inner.map(_.conditions))
+                conditions2 = inner.map(_.conditions)
                 if (!t._1 && handler.isEmpty) {
                   result = (false, undefinedSubst)
                   return
                 }
                 undefinedSubst = t._2
-              } else handler.foreach(_ => conditions2 = Some(Seq(CCondition.FromNothing(left))))
+              } else conditions2 = conditions2.map(_ => Seq(CCondition.FromNothing(left)))
               handler.foreach { h =>
                 val a = ScAbstractType(tpt, lower, upper)
                 h + CCondition.Equivalent(
@@ -1158,23 +1158,23 @@ object Conformance extends api.Conformance {
                 if (!upper.equiv(Any)) {
                   val inner = handler.map(_.inner)
                   val t = conformsInner(upper, right, visited, undefinedSubst, checkWeak, handler = inner)
-                  handler.foreach(_ => conditions1 = inner.map(_.conditions))
+                  conditions1 = inner.map(_.conditions)
                   if (!t._1 && handler.isEmpty) {
                     result = (false, undefinedSubst)
                     return
                   }
                   undefinedSubst = t._2
-                } else handler.foreach(_ => conditions1 = Some(Seq(CCondition.ToAny(right))))
+                } else conditions1 = conditions1.map(_ => Seq(CCondition.ToAny(right)))
                 if (!lower.equiv(Nothing)) {
                   val inner = handler.map(_.inner)
                   val t = conformsInner(right, lower, visited, undefinedSubst, checkWeak, handler = inner)
-                  handler.foreach(_ => conditions2 = inner.map(_.conditions))
+                  conditions2 = inner.map(_.conditions)
                   if (!t._1 && handler.isEmpty) {
                     result = (false, undefinedSubst)
                     return
                   }
                   undefinedSubst = t._2
-                } else handler.foreach(_ => conditions2 = Some(Seq(CCondition.FromNothing(right))))
+                } else conditions2 = conditions2.map(_ => Seq(CCondition.FromNothing(right)))
                 handler.foreach { h =>
                   val a = ScAbstractType(tpt, lower, upper)
                   h + CCondition.Equivalent(
@@ -1194,23 +1194,23 @@ object Conformance extends api.Conformance {
                 if (!upper.equiv(Any)) {
                   val inner = handler.map(_.inner)
                   val t = conformsInner(upper, left, visited, undefinedSubst, checkWeak, handler = inner)
-                  handler.foreach(_ => conditions1 = inner.map(_.conditions))
+                  conditions1 = inner.map(_.conditions)
                   if (!t._1 && handler.isEmpty) {
                     result = (false, undefinedSubst)
                     return
                   }
                   undefinedSubst = t._2
-                } else handler.foreach(_ => conditions1 = Some(Seq(CCondition.ToAny(left))))
+                } else conditions1 = conditions1.map(_ => Seq(CCondition.ToAny(left)))
                 if (!lower.equiv(Nothing)) {
                   val inner = handler.map(_.inner)
                   val t = conformsInner(left, lower, visited, undefinedSubst, checkWeak, handler = inner)
-                  handler.foreach(_ => conditions2 = inner.map(_.conditions))
+                  conditions2 = inner.map(_.conditions)
                   if (!t._1 && handler.isEmpty) {
                     result = (false, undefinedSubst)
                     return
                   }
                   undefinedSubst = t._2
-                } else handler.foreach(_ => conditions2 = Some(Seq(CCondition.FromNothing(left))))
+                } else conditions2 = conditions2.map(_ => Seq(CCondition.FromNothing(left)))
                 handler.foreach { h =>
                   val a = ScAbstractType(tpt, lower, upper)
                   h + CCondition.Equivalent(
@@ -1265,10 +1265,10 @@ object Conformance extends api.Conformance {
           if (!upper.equiv(Any)) {
             val inner = handler.map(_.inner)
             result = conformsInner(upper, r, visited, undefinedSubst, checkWeak, handler = inner)
-            handler.foreach(_ => conditions1 = inner.map(_.conditions))
+            conditions1 = inner.map(_.conditions)
           } else {
             result = (true, undefinedSubst)
-            handler.foreach(_ => conditions1 = Some(Seq(CCondition.ToAny(r))))
+            conditions1 = conditions1.map(_ => Seq(CCondition.ToAny(r)))
           }
           if (result._1 || handler.nonEmpty) {
             var conditions2 = handler.map(_ => Seq.empty[CCondition])
@@ -1280,10 +1280,10 @@ object Conformance extends api.Conformance {
             if (!lower.equiv(Nothing)) {
               val inner = handler.map(_.inner)
               val t = conformsInner(r, lower, visited, result._2, checkWeak, handler = inner)
-              handler.foreach(_ => conditions2 = inner.map(_.conditions))
+              conditions2 = inner.map(_.conditions)
               if (t._1) result = t
             }
-            else handler.foreach(_ => conditions2 = Some(Seq(CCondition.FromNothing(r))))
+            else conditions2 = conditions2.map(_ => Seq(CCondition.FromNothing(r)))
             handler.foreach(_ + CCondition.UndefinedLeft(a, r, conditions1.get, conditions2.get))
           }
 
@@ -1594,23 +1594,23 @@ object Conformance extends api.Conformance {
                 if (!upper.equiv(Any)) {
                   val inner = handler.map(_.inner)
                   val t = conformsInner(upper, right, visited, undefinedSubst, checkWeak, handler = inner)
-                  handler.foreach(_ => conditions1 = inner.map(_.conditions))
+                  conditions1 = inner.map(_.conditions)
                   if (!t._1 && handler.isEmpty) {
                     result = (false, undefinedSubst)
                     return
                   }
                   undefinedSubst = t._2
-                } else handler.foreach(_ => conditions1 = Some(Seq(CCondition.ToAny(right))))
+                } else conditions1 = conditions1.map(_ => Seq(CCondition.ToAny(right)))
                 if (!lower.equiv(Nothing)) {
                   val inner = handler.map(_.inner)
                   val t = conformsInner(right, lower, visited, undefinedSubst, checkWeak, handler = inner)
-                  handler.foreach(_ => conditions2 = inner.map(_.conditions))
+                  conditions2 = inner.map(_.conditions)
                   if (!t._1 && handler.isEmpty) {
                     result = (false, undefinedSubst)
                     return
                   }
                   undefinedSubst = t._2
-                } else handler.foreach(_ => conditions2 = Some(Seq(CCondition.FromNothing(right))))
+                } else conditions2 = conditions2.map(_ => Seq(CCondition.FromNothing(right)))
                 handler.foreach { h =>
                   val a = ScAbstractType(tpt, lower, upper)
                   h + CCondition.Equivalent(Relation.Equivalence(a, right, ECondition.Special(
@@ -1628,23 +1628,23 @@ object Conformance extends api.Conformance {
                 if (!upper.equiv(Any)) {
                   val inner = handler.map(_.inner)
                   val t = conformsInner(upper, left, visited, undefinedSubst, checkWeak, handler = inner)
-                  handler.foreach(_ => conditions1 = inner.map(_.conditions))
+                  conditions1 = inner.map(_.conditions)
                   if (!t._1 && handler.isEmpty) {
                     result = (false, undefinedSubst)
                     return
                   }
                   undefinedSubst = t._2
-                } else handler.foreach(_ => conditions1 = Some(Seq(CCondition.ToAny(left))))
+                } else conditions1 = conditions1.map(_ => Seq(CCondition.ToAny(left)))
                 if (!lower.equiv(Nothing)) {
                   val inner = handler.map(_.inner)
                   val t = conformsInner(left, lower, visited, undefinedSubst, checkWeak, handler = inner)
-                  handler.foreach(_ => conditions2 = inner.map(_.conditions))
+                  conditions2 = inner.map(_.conditions)
                   if (!t._1 && handler.isEmpty) {
                     result = (false, undefinedSubst)
                     return
                   }
                   undefinedSubst = t._2
-                } else handler.foreach(_ => conditions2 = Some(Seq(CCondition.FromNothing(left))))
+                } else conditions2 = conditions2.map(_ => Seq(CCondition.FromNothing(left)))
                 handler.foreach { h =>
                   val a = ScAbstractType(tpt, lower, upper)
                   h + CCondition.Equivalent(Relation.Equivalence(a, left, ECondition.Special(

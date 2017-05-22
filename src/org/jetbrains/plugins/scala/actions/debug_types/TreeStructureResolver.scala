@@ -11,7 +11,7 @@ import com.intellij.psi.util.PsiTreeUtil
 import com.intellij.psi.{PsiElement, PsiField, PsiMethod, PsiNamedElement}
 import TreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue, TypeVariableNode}
 import org.jetbrains.plugins.scala.actions.debug_types.TreeStructureCompatibility.{CompatibilityNode, CompatibilityValue, MostSpecificNode, MostSpecificValue}
-import org.jetbrains.plugins.scala.actions.debug_types.DCTreeStructureConformance._
+import org.jetbrains.plugins.scala.actions.debug_types.TreeStructureConformance._
 import org.jetbrains.plugins.scala.lang.psi.api.base.ScPrimaryConstructor
 import org.jetbrains.plugins.scala.lang.psi.api.base.patterns.ScReferencePattern
 import org.jetbrains.plugins.scala.lang.psi.api.statements.{ScFun, ScFunction, ScPatternDefinition, ScVariableDefinition}

@@ -214,6 +214,7 @@ object uninstrumentedMacro {
           transform(term)
         case Apply(Select(maybeFalse, TermName("$bar$bar")), List(term)) if falseExpression(instrumentation, maybeFalse) =>
           transform(term)
+        case Assign(Ident(TermName(name)), _) if instrumentation(name) => Literal(Constant(()))
         case Apply(Select(Ident(TermName(name)), _), _) if instrumentation(name) => Literal(Constant(()))
         case a@Apply(fun, args) if a != pendingSuperCall => // pendingSuperCall matches on Apply and ruins final ast
           val nArgs = args.filterNot(parameterContainsInstrumentation(_, instrumentation))

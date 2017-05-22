@@ -7,7 +7,7 @@ import com.intellij.ide.util.treeView.AbstractTreeNode
 import com.intellij.openapi.editor.colors.CodeInsightColors
 import com.intellij.openapi.project.Project
 import AsSpecificAsCondition._
-import DCTreeStructureConformance.{RelationNode, RelationValue}
+import TreeStructureConformance.{RelationNode, RelationValue}
 import TreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue}
 
 
@@ -17,8 +17,8 @@ object TreeStructureCompatibility {
 
   class CompatibilityNode(value: CompatibilityValue)(implicit project: Project) extends AbstractTreeNode[CompatibilityValue](project, value) {
     private val args = value.arguments.map(a =>
-      new DCTreeStructureConformance.RelationNode(
-        DCTreeStructureConformance.RelationValue(
+      new TreeStructureConformance.RelationNode(
+        TreeStructureConformance.RelationValue(
           Relation.Conformance(a.expectedType, a.actualType, a.conditions),
           a.name
         )
@@ -26,8 +26,8 @@ object TreeStructureCompatibility {
     )
 
     private val ret = value.ret.map(r =>
-      new DCTreeStructureConformance.RelationNode(
-        DCTreeStructureConformance.RelationValue(
+      new TreeStructureConformance.RelationNode(
+        TreeStructureConformance.RelationValue(
           Relation.Conformance(r.expextedType, r.actualType, r.conditions),
           "return"
         )

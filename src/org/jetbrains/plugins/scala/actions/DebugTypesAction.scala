@@ -151,9 +151,8 @@ class DebugTypesAction extends AnAction("Debug conformance action") {
       val selectionEnd = editor.getSelectionModel.getSelectionEnd
 
       val elements = ScalaRefactoringUtil.selectedElements(editor, file.asInstanceOf[ScalaFile], trimComments = false)
-      println(elements)
 
-      elements.foreach { // TODO how to handle dsl style like a + b
+      elements.foreach {
         case expr: ScReferenceExpression => processReferenceExpression(expr)
         case expr: ScExpression => processExpression(expr)
         case _ =>
@@ -161,31 +160,25 @@ class DebugTypesAction extends AnAction("Debug conformance action") {
             case Some((expr, _)) => processExpression(expr)
             case _ => showHint("No expression found.")
           }
-
-          println(e)
       }
-    } else {
-      println("TODO")
+    } /*else {
       val offset = editor.getCaretModel.getOffset
       val element: PsiElement = file.findElementAt(offset) match {
         case w: PsiWhiteSpace if w.getTextRange.getStartOffset == offset &&
           w.getText.contains("\n") => file.findElementAt(offset - 1)
         case p => p
       }
-      println(e)
       element match {
         case e: PsiNamedElement => println(e)
       }
-    }
+    }*/
   }
 
   private def processReferenceExpression(reference: ScReferenceExpression)(implicit editor: Editor) = {
     implicit val project: Project = editor.getProject
     val handler = new DTHandler.Resolver("", false)
-    // TODO? uncomment
-    val r = ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
+    ReferenceExpressionResolver.resolve$I(reference, shapesOnly = false, incomplete = false,  handler = Some(handler))
     val values = handler.candidates.map(c => TreeStructureResolver.Value(c._1, c._2, handler.ret))
-    println(values)
     showPopup(new TreeStructureResolver(values))
   }
 
@@ -194,11 +187,10 @@ class DebugTypesAction extends AnAction("Debug conformance action") {
     implicit val typeSystem: TypeSystem = e.typeSystem
     implicit val project: Project = editor.getProject
     val handler = new DTHandler.Conformance("", false)
-    // TODO? uncomment
     val leftOption = e.expectedType()
     val rightTypeResult = e.getNonValueType().map(_.inferValueType)
     leftOption match {
-      case Some(left) => // TODO get fresh type variable if expected not found
+      case Some(left) =>
         rightTypeResult match {
           case Success(right, _) =>
             handler.log("Action fired on:")
@@ -207,8 +199,8 @@ class DebugTypesAction extends AnAction("Debug conformance action") {
             val r = Conformance.conformsInner$I(left, right, handler = Some(inner))
             println(r)
             val conformance = Relation.Conformance(left, right, inner.conditions)
-            val values = Seq(DCTreeStructureConformance.Value(if (true) DTAdapter(conformance) else conformance))
-            showPopup(new DCTreeStructureConformance(values))
+            val values = Seq(TreeStructureConformance.Value(if (true) DTAdapter(conformance) else conformance))
+            showPopup(new TreeStructureConformance(values))
             println(inner.conditions)
           case Failure(cause, _) => showHint(s"Can't derive type: $cause")
         }
