@@ -12,14 +12,15 @@ import TreeStructureSubstitutor.{SubstitutorNode, SubstitutorValue}
 
 
 object TreeStructureCompatibility {
-  case class CompatibilityValue(arguments: Seq[DTHandler.Compatibility#Arg], ret: Option[DTHandler.Resolver#Ret])
-  case class MostSpecificValue(asSpecificAsCondition: AsSpecificAsCondition)
+  case class CompatibilityValue(arguments: Seq[DTHandler.Compatibility#Arg], ret: Option[DTHandler.Resolver#Ret],
+                                ctx: RelationContext)
 
   class CompatibilityNode(value: CompatibilityValue)(implicit project: Project) extends AbstractTreeNode[CompatibilityValue](project, value) {
     private val args = value.arguments.map(a =>
       new TreeStructureConformance.RelationNode(
         TreeStructureConformance.RelationValue(
           Relation.Conformance(a.expectedType, a.actualType, a.conditions),
+          value.ctx,
           a.name
         )
       )
@@ -29,6 +30,7 @@ object TreeStructureCompatibility {
       new TreeStructureConformance.RelationNode(
         TreeStructureConformance.RelationValue(
           Relation.Conformance(r.expextedType, r.actualType, r.conditions),
+          value.ctx,
           "return"
         )
       )
@@ -43,20 +45,24 @@ object TreeStructureCompatibility {
 
     override def update(presentationData: PresentationData): Unit = {
       presentationData.setPresentableText("application")
-      if (!value.arguments.forall(_.satisfy) || value.ret.exists(_.conditions.forall(!_.satisfy)))
+      if (!value.arguments.forall(_.satisfy(value.ctx)) || value.ret.exists(_.conditions.forall(!_.satisfy(value.ctx))))
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
   }
+
+  case class MostSpecificValue(asSpecificAsCondition: AsSpecificAsCondition)
 
   class MostSpecificNode(value: MostSpecificValue)(implicit project: Project) extends AbstractTreeNode[MostSpecificValue](project, value) {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
       value.asSpecificAsCondition match {
         case Method(_, _, args, restrictions) =>
-          list.add(new CompatibilityNode(CompatibilityValue(args, None)))
+          val rc = RelationContext(restrictions.find(_.forall(_.satisfy)).getOrElse(Seq()))
+          list.add(new CompatibilityNode(CompatibilityValue(args, None, rc)))
           list.add(new SubstitutorNode(SubstitutorValue(restrictions)))
         case Conforms(left, right, conditions) =>
-          list.add(new RelationNode(RelationValue(Relation.Conformance(left, right, conditions))))
+          val rc = RelationContext(Seq(), ignoreRestrictions = true)
+          list.add(new RelationNode(RelationValue(Relation.Conformance(left, right, conditions), rc)))
         case _ =>
       }
       list

@@ -452,7 +452,6 @@ object Compatibility {
       case fun: ScFunction =>
         handler.foreach(_.logCase("ScFunction"))
         if(!fun.hasParameterClause && argClauses.nonEmpty) {
-          handler.foreach(_.logn("strange condition with parameters and args failed - skip"))
           return ConformanceExtResult(Seq(new DoesNotTakeParameters))
         }
 
@@ -534,9 +533,7 @@ object Compatibility {
         res
 
       case method: PsiMethod =>
-        handler.foreach { h =>
-          h.logCase("PsiMethod")
-        }
+        handler.foreach(_.logCase("PsiMethod"))
         val parameters: Seq[PsiParameter] = method.parameters
 
         val excess = exprs.length - parameters.length
@@ -558,9 +555,7 @@ object Compatibility {
         }, exprs = exprs, checkWithImplicits = checkWithImplicits, isShapesResolve = isShapesResolve, handler = handler)
 
       case _ =>
-        handler.foreach { h =>
-          h.logn("no case found - 22")
-        }
+        handler.foreach(_.logn("no case found - 22"))
         ConformanceExtResult(Seq(new ApplicabilityProblem("22")))
     }
   }

@@ -129,9 +129,10 @@ object TreeStructureResolver {
   case class WeightsValue(weights: Map[PsiNamedElement, DTHandler.Resolver#Weight])
 
   class CandidateNode(value: CandidateValue)(implicit project: Project) extends AbstractPsiBasedNode[CandidateValue](project, value, ViewSettings.DEFAULT) {
+    private val rc = RelationContext(value.candidate.restrictions.find(_.forall(_.satisfy)).getOrElse(Seq()))
     private val greaterWeight = value.candidate.weights.values.forall(_.wins)
     private val restictionsHaveSolution = value.candidate.restrictions.exists(_.forall(_.`type`.nonEmpty)) || value.candidate.restrictions.isEmpty
-    private val conditionsExists = value.candidate.args.forall(_.conditions.exists(_.satisfy))
+    private val conditionsExists = value.candidate.args.forall(_.conditions.exists(_.satisfy(rc)))
     private val problems = value.candidate.rr.iterator.flatMap(_.problems).toSeq.filterNot {
       case ExpectedTypeMismatch => true
       case _: TypeMismatch => true
@@ -156,8 +157,10 @@ object TreeStructureResolver {
         texts.foreach(text => list.add(new TextNode(TextValue(text, satisfy = false))))
       }
       else {
-        if (value.candidate.args.nonEmpty || value.ret.nonEmpty)
-          list.add(new CompatibilityNode(CompatibilityValue(value.candidate.args, value.ret)))
+        if (value.candidate.args.nonEmpty || value.ret.nonEmpty) {
+          val rc = RelationContext(value.candidate.restrictions.find(_.forall(_.satisfy)).getOrElse(Seq()))
+          list.add(new CompatibilityNode(CompatibilityValue(value.candidate.args, value.ret, rc)))
+        }
         if (value.candidate.restrictions.exists(_.nonEmpty))
           list.add(new SubstitutorNode(SubstitutorValue(value.candidate.restrictions)))
         if (value.candidate.defaultInterfere)

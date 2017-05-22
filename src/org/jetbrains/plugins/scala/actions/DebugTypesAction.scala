@@ -34,7 +34,7 @@ import org.jetbrains.plugins.scala.lang.resolve.{ReferenceExpressionResolver, Sc
 /**
   * Created by user on 3/20/17.
   */
-class DebugTypesAction extends AnAction("Debug conformance action") {
+class DebugTypesAction extends AnAction("Debug types action") {
 
   private def getSelectedNode(jTree: JTree): AbstractTreeNode[_] = {
     val path: TreePath = jTree.getSelectionPath
@@ -199,7 +199,8 @@ class DebugTypesAction extends AnAction("Debug conformance action") {
             val r = Conformance.conformsInner$I(left, right, handler = Some(inner))
             println(r)
             val conformance = Relation.Conformance(left, right, inner.conditions)
-            val values = Seq(TreeStructureConformance.Value(if (true) DTAdapter(conformance) else conformance))
+            val rc = RelationContext(Seq(), ignoreRestrictions = true)
+            val values = Seq(TreeStructureConformance.Value(if (true) DTAdapter(conformance) else conformance, rc))
             showPopup(new TreeStructureConformance(values))
             println(inner.conditions)
           case Failure(cause, _) => showHint(s"Can't derive type: $cause")

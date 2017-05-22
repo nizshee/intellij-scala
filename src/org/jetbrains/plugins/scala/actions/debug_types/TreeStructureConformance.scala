@@ -23,7 +23,7 @@ class TreeStructureConformance(values: Seq[TreeStructureConformance.Value])(impl
   private class RootNode extends AbstractTreeNode[Any](project, ()) {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
-      values.foreach { value => list.add(new RelationNode(RelationValue(value.relation))) }
+      values.foreach { value => list.add(new RelationNode(RelationValue(value.relation, value.ctx))) }
       list
     }
 
@@ -35,7 +35,7 @@ class TreeStructureConformance(values: Seq[TreeStructureConformance.Value])(impl
   override def getRootElement: AnyRef = new RootNode
 
   override def getChildElements(o: scala.Any): Array[AnyRef] = o match {
-    case _: RootNode => values.map(v => new RelationNode(RelationValue(v.relation))).toArray
+    case _: RootNode => values.map(v => new RelationNode(RelationValue(v.relation, v.ctx))).toArray
     case n: CandidateNode =>
       val children = n.getChildren
       children.toArray(new Array[AnyRef](children.size))
@@ -87,50 +87,50 @@ class TreeStructureConformance(values: Seq[TreeStructureConformance.Value])(impl
 
 
 object TreeStructureConformance {
-  case class Value(relation: Relation, prefix: String = "")
+  case class Value(relation: Relation, ctx: RelationContext, prefix: String = "")
 
-  case class RelationValue(v: Relation, prefix: String = "")
-  case class CConditionValue(v: CCondition, prefix: String = "")
-  case class ElementValue(name: String, namedElement: Option[PsiNamedElement])
+  case class RelationValue(v: Relation, ctx: RelationContext, prefix: String = "")
+  case class CConditionValue(v: CCondition, ctx: RelationContext, prefix: String = "")
+  case class ElementValue(name: String, namedElement: Option[PsiNamedElement], ctx: RelationContext)
 
-  class RelationNode(relation: RelationValue)(implicit project: Project) extends AbstractTreeNode[RelationValue](project, relation) {
+  class RelationNode(value: RelationValue)(implicit project: Project) extends AbstractTreeNode[RelationValue](project, value) {
 
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
-      relation.v match {
+      value.v match {
         case r: Relation.Conformance =>
           DTAdapter(r).conditions.foreach { condition =>
-            list.add(new CConditionNode(CConditionValue(condition)))
+            list.add(new CConditionNode(CConditionValue(condition, value.ctx)))
           }
         case r: Relation.Equivalence =>
-          list.add(new EConditionNode(EConditionValue(r.condition)))
+          list.add(new EConditionNode(EConditionValue(r.condition, value.ctx)))
       }
       list
     }
 
     override def update(presentationData: PresentationData): Unit = {
-      relation.v match {
+      value.v match {
         case r: Relation.Equivalence =>
-          presentationData.setPresentableText((if (relation.prefix.nonEmpty) relation.prefix + ": " else "") +
+          presentationData.setPresentableText((if (value.prefix.nonEmpty) value.prefix + ": " else "") +
             s"${r.right} =: ${r.left}")
         case r: Relation.Conformance =>
-          presentationData.setPresentableText((if (relation.prefix.nonEmpty) relation.prefix + ": " else "") +
+          presentationData.setPresentableText((if (value.prefix.nonEmpty) value.prefix + ": " else "") +
             s"${r.right} <: ${r.left}")
       }
-      if (!relation.v.satisfy)
+      if (!value.v.satisfy(value.ctx))
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
   }
 
-  case class EConditionValue(condition: ECondition)
+  case class EConditionValue(condition: ECondition, ctx: RelationContext)
   class EConditionNode(value: EConditionValue)(implicit project: Project) extends AbstractTreeNode[EConditionValue](project, value) {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
       value.condition match {
         case _: Simple =>
         case Special(left, right) =>
-          left.foreach(c => list.add(new RelationNode(RelationValue(c))))
-          right.foreach(c => list.add(new RelationNode(RelationValue(c))))
+          left.foreach(c => list.add(new RelationNode(RelationValue(c, value.ctx))))
+          right.foreach(c => list.add(new RelationNode(RelationValue(c, value.ctx))))
       }
       list
     }
@@ -142,7 +142,7 @@ object TreeStructureConformance {
       }
       presentationData.setPresentableText(text)
       presentationData.setTooltip(getTip(value.condition))
-      if (!value.condition.satisfy)
+      if (!value.condition.satisfy(value.ctx))
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
 
@@ -152,60 +152,60 @@ object TreeStructureConformance {
     }
   }
 
-  class CConditionNode(condition: CConditionValue)(implicit project: Project) extends AbstractTreeNode[CConditionValue](project, condition) {
+  class CConditionNode(value: CConditionValue)(implicit project: Project) extends AbstractTreeNode[CConditionValue](project, value) {
     override def getChildren: util.Collection[_ <: AbstractTreeNode[_]] = {
       val list = new util.ArrayList[AbstractTreeNode[_]]()
-      condition.v match {
+      value.v match {
         case c: CCondition.Equivalent =>
-          list.add(new RelationNode(RelationValue(c.equivalence)))
+          list.add(new RelationNode(RelationValue(c.equivalence, value.ctx)))
         case c: CCondition.Parametrize =>
-          c.equals.foreach(c => list.add(new RelationNode(RelationValue(c))))
+          c.equals.foreach(c => list.add(new RelationNode(RelationValue(c, value.ctx))))
           c.conform.foreach {
             case CCondition.Invariant(param, e) =>
-              list.add(new RelationNode(RelationValue(e, s"invariant $param")))
+              list.add(new RelationNode(RelationValue(e, value.ctx, s"invariant $param")))
             case CCondition.Covariant(param, e) =>
-              list.add(new RelationNode(RelationValue(e, s"covariant $param")))
+              list.add(new RelationNode(RelationValue(e, value.ctx, s"covariant $param")))
             case CCondition.Contrvariant(param, e) =>
-              list.add(new RelationNode(RelationValue(e, s"contrvariant $param")))
+              list.add(new RelationNode(RelationValue(e, value.ctx, s"contrvariant $param")))
           }
         case c: CCondition.Transitive =>
-          list.add(new RelationNode(RelationValue(c.lm)))
-          list.add(new RelationNode(RelationValue(c.mr)))
+          list.add(new RelationNode(RelationValue(c.lm, value.ctx)))
+          list.add(new RelationNode(RelationValue(c.mr, value.ctx)))
         case c: CCondition.Projection =>
-          list.add(new RelationNode(RelationValue(c.conforms)))
+          list.add(new RelationNode(RelationValue(c.conforms, value.ctx)))
         case c: CCondition.Method =>
-          c.ret.foreach(c => list.add(new RelationNode(RelationValue(c, "ret"))))
-          c.args.foreach(c => list.add(new RelationNode(RelationValue(c.relation, "arg"))))
+          c.ret.foreach(c => list.add(new RelationNode(RelationValue(c, value.ctx, "ret"))))
+          c.args.foreach(c => list.add(new RelationNode(RelationValue(c.relation, value.ctx, "arg"))))
         case c: CCondition.CompoundRight =>
-          c.relations.foreach(c => list.add(new RelationNode(RelationValue(c))))
+          c.relations.foreach(c => list.add(new RelationNode(RelationValue(c, value.ctx))))
         case c: CCondition.CompoundLeft =>
-          c.relations.foreach(c => list.add(new RelationNode(RelationValue(c))))
+          c.relations.foreach(c => list.add(new RelationNode(RelationValue(c, value.ctx))))
           c.left.signatureMap.foreach { case (sign, ty) =>
             val name = s"exists ${sign.name}: $ty" // TODO? function signatures
-            list.add(new ElementNode(ElementValue(name, c.signatures.get(sign -> ty))))
+            list.add(new ElementNode(ElementValue(name, c.signatures.get(sign -> ty), value.ctx)))
           }
           c.left.typesMap.foreach { case (n, sign) =>
             val params = if (sign.typeParams.nonEmpty) s"[${sign.typeParams.mkString(", ")}]" else ""
             val name = s"exists type ${sign.name}$params <: ${sign.upperBound} >: ${sign.lowerBound}"
-            list.add(new ElementNode(ElementValue(name, c.aliases.get(n -> sign))))
+            list.add(new ElementNode(ElementValue(name, c.aliases.get(n -> sign), value.ctx)))
           }
         case c: CCondition.ExistentialRight =>
-          list.add(new RelationNode(RelationValue(c.conformance)))
+          list.add(new RelationNode(RelationValue(c.conformance, value.ctx)))
         case c: CCondition.UndefinedRight =>
-          c.lConfitions.foreach(v => list.add(new CConditionNode(CConditionValue(v))))
+          c.lConfitions.foreach(v => list.add(new CConditionNode(CConditionValue(v, value.ctx))))
         case c: CCondition.UndefinedLeft =>
-          c.uConditions.foreach(v => list.add(new CConditionNode(CConditionValue(v))))
+          c.uConditions.foreach(v => list.add(new CConditionNode(CConditionValue(v, value.ctx))))
         case c: BaseType =>
         case c: ExistentialLeft => // TODO? too raw
-          list.add(new RelationNode(RelationValue(c.conformance)))
+          list.add(new RelationNode(RelationValue(c.conformance, value.ctx)))
           list.add(new SubstitutorNode(SubstitutorValue(c.restrictions)))
         case c: FromNothing =>
         case c: FromNull =>
         case c: Polymorphic => // TODO? too raw
-          c.i.foreach(v => list.add(new RelationNode(RelationValue(v))))
+          c.i.foreach(v => list.add(new RelationNode(RelationValue(v, value.ctx))))
           c.args.foreach { case (v1, v2) =>
-            list.add(new RelationNode(RelationValue(v1)))
-            list.add(new RelationNode(RelationValue(v2)))
+            list.add(new RelationNode(RelationValue(v1, value.ctx)))
+            list.add(new RelationNode(RelationValue(v2, value.ctx)))
           }
         case c: RestrictionRight =>
         case c: RestrictionLeft =>
@@ -218,7 +218,7 @@ object TreeStructureConformance {
     }
 
     override def update(presentationData: PresentationData): Unit = {
-      val data = condition.v match {
+      val data = value.v match {
         case c: CCondition.Equivalent =>
           s"${c.equivalence.right} conforms to ${c.equivalence.left} if they are equivalent"
         case c: CCondition.BaseType =>
@@ -244,9 +244,17 @@ object TreeStructureConformance {
         case c: CCondition.FromNull =>
           s"${c.left} is conforms to AnyRef"
         case c: CCondition.RestrictionLeft =>
-          s"[restriction] ${c.right} <: ${c.name._1}"
+          val res = value.ctx.restrictions.find(_.name == c.name)
+          val r =
+            if (res.exists(_.upperFor(c.right))) res.flatMap(_.`type`).map(v => s"(${v.presentableText})").getOrElse("")
+            else ""
+          s"[restriction] ${c.right} <: ${c.name._1}$r"
         case c: CCondition.RestrictionRight =>
-          s"[restriction] ${c.name._1} <: ${c.left}"
+          val res = value.ctx.restrictions.find(_.name == c.name)
+          val r =
+            if (res.exists(_.lowerFor(c.left))) res.flatMap(_.`type`).map(v => s"(${v.presentableText})").getOrElse("")
+            else ""
+          s"[restriction] ${c.name._1}$r <: ${c.left}"
         case c: CCondition.CompoundRight =>
           s"if conforms at least one"
         case c: CCondition.CompoundLeft =>
@@ -262,10 +270,10 @@ object TreeStructureConformance {
         case c: CCondition.Todo =>
           s"todo: ${c.reason}"
       }
-      val msg = condition.v.msg
-      presentationData.setTooltip(getTip(condition.v))
+      val msg = value.v.msg
+      presentationData.setTooltip(getTip(value.v))
       presentationData.setPresentableText(s"$data" + (if (msg.nonEmpty) "//" else "") + msg)
-      if (!condition.v.satisfy)
+      if (!value.v.satisfy(value.ctx))
         presentationData.setAttributesKey(CodeInsightColors.WRONG_REFERENCES_ATTRIBUTES)
     }
 

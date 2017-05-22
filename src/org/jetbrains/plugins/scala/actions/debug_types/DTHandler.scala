@@ -2,7 +2,7 @@ package org.jetbrains.plugins.scala.actions.debug_types
 
 import com.intellij.psi.PsiNamedElement
 import org.jetbrains.plugins.scala.actions._
-import org.jetbrains.plugins.scala.lang.psi.types.api.{Any, Nothing}
+import org.jetbrains.plugins.scala.lang.psi.types.api.{Any, Nothing, TypeSystem}
 import org.jetbrains.plugins.scala.lang.psi.types.{ScCompoundType, ScType, ScUndefinedSubstitutor, ScalaTypeSystem, Signature, TypeAliasSignature}
 import org.jetbrains.plugins.scala.lang.resolve.ScalaResolveResult
 
@@ -106,7 +106,7 @@ object DTHandler {
                    expectedType: ScType,
                    actualType: ScType,
                    conditions: Seq[CCondition]) {
-      def satisfy: Boolean = conditions.exists(_.satisfy)
+      def satisfy(ctx: RelationContext): Boolean = conditions.exists(_.satisfy(ctx))
     }
 
 
@@ -121,15 +121,23 @@ object DTHandler {
     def args: Seq[Arg] = _args
 
     def logCase(any: Any): Unit = {
+//      println(any) // TODO? remove
       logn("case - " + any)
     }
   }
 
   class Substitutor(delimeter: String, debug: Boolean) extends DTHandler(delimeter, debug) {
+
+    implicit val typeSystem: TypeSystem = ScalaTypeSystem
+
     case class Restriction(name: (String, Long),
                            `type`: Option[ScType],
                            uppers: Set[ScType],
-                           lowers: Set[ScType])
+                           lowers: Set[ScType]) {
+      def satisfy: Boolean = `type`.nonEmpty
+      def upperFor(t: ScType): Boolean = lowers(t) || t.equiv(Nothing)
+      def lowerFor(t: ScType): Boolean = uppers(t) || t.equiv(Any)
+    }
 
     private var _restrictions: Seq[Restriction] = Seq.empty
     private var _follows: Seq[Seq[Substitutor#Restriction]] = Seq.empty

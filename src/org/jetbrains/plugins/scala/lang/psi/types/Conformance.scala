@@ -1696,7 +1696,7 @@ object Conformance extends api.Conformance {
     }
 
     override def visitExistentialType(e: ScExistentialType) {
-      handler.foreach(_.visit("visitExistentialType - todo1"))
+      handler.foreach(_.visit("visitExistentialType - ok"))
       var rightVisitor: ScalaTypeVisitor =
         new ValDesignatorSimplification with UndefinedSubstVisitor
           with AbstractVisitor
